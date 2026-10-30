@@ -356,9 +356,24 @@
             const video = document.getElementById(videoId);
 
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { exact: "environment" } }
-                }).catch(() => navigator.mediaDevices.getUserMedia({ video: true }));
+                // Request higher HD resolution constraints for scanning high-density printed QR codes
+                const constraints = {
+                    video: {
+                        facingMode: { exact: "environment" },
+                        width: { ideal: 1920, min: 1280 },
+                        height: { ideal: 1080, min: 720 },
+                        focusMode: "continuous"
+                    }
+                };
+
+                let stream;
+                try {
+                    stream = await navigator.mediaDevices.getUserMedia(constraints);
+                } catch (e) {
+                    stream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: "environment", width: { ideal: 1280 }, height: { ideal: 720 } }
+                    }).catch(() => navigator.mediaDevices.getUserMedia({ video: true }));
+                }
 
                 if (mode === 'QR') qrStream = stream;
                 else docketStream = stream;
@@ -405,7 +420,17 @@
                 try {
                     const formats = mode === 'QR' ? ['qr_code'] : ['code_128', 'code_39', 'ean_13', 'upc_a', 'qr_code'];
                     const detector = new BarcodeDetector({ formats });
-                    const barcodes = await detector.detect(video);
+                    
+                    // Direct Detection
+                    let barcodes = await detector.detect(video);
+
+                    // High-contrast contrast boost fallback for thermal paper prints
+                    if (barcodes.length === 0 && mode === 'QR') {
+                        const processedCanvas = processThermalQRFrame(video);
+                        if (processedCanvas) {
+                            barcodes = await detector.detect(processedCanvas);
+                        }
+                    }
 
                     if (barcodes.length > 0) {
                         const rawValue = barcodes[0].rawValue;
@@ -419,7 +444,41 @@
             }
 
             if (activeStream) {
-                setTimeout(() => requestAnimationFrame(() => scanFrame(mode)), 200);
+                setTimeout(() => requestAnimationFrame(() => scanFrame(mode)), 150);
+            }
+        }
+
+        // Processing filter canvas for dense Zebra thermal labels
+        function processThermalQRFrame(video) {
+            try {
+                if (!window._scanCanvas) {
+                    window._scanCanvas = document.createElement('canvas');
+                }
+                const canvas = window._scanCanvas;
+                const width = video.videoWidth || 640;
+                const height = video.videoHeight || 480;
+
+                canvas.width = width;
+                canvas.height = height;
+
+                const ctx = canvas.getContext('2d', { willReadFrequently: true });
+                ctx.drawImage(video, 0, 0, width, height);
+
+                const imgData = ctx.getImageData(0, 0, width, height);
+                const d = imgData.data;
+
+                // Threshold contrast enhancement
+                for (let i = 0; i < d.length; i += 4) {
+                    const avg = (d[i] + d[i + 1] + d[i + 2]) / 3;
+                    const v = avg < 110 ? 0 : 255; // Sharp thresholding for dark modules on light thermal paper
+                    d[i] = v;
+                    d[i + 1] = v;
+                    d[i + 2] = v;
+                }
+                ctx.putImageData(imgData, 0, 0);
+                return canvas;
+            } catch (e) {
+                return null;
             }
         }
 
