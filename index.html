@@ -11,10 +11,11 @@
     <!-- JSZip for bundling CSV and Images into Zip -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        /* Custom Mobile Adjustments */
+        /* Custom Mobile & Dark Mode Adjustments */
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            background-color: #f3f4f6;
+            background-color: #0f172a;
+            color: #f8fafc;
             touch-action: manipulation;
         }
         .scanner-viewport {
@@ -31,46 +32,46 @@
         .scan-overlay {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
-            border: 2px solid rgba(59, 130, 246, 0.5);
-            box-shadow: inset 0 0 0 2000px rgba(0, 0, 0, 0.35);
+            border: 2px solid rgba(6, 182, 212, 0.5);
+            box-shadow: inset 0 0 0 2000px rgba(0, 0, 0, 0.45);
             display: flex;
             align-items: center;
             justify-content: center;
         }
         .scan-box {
-            width: 75%;
-            height: 55%;
-            border: 2px dashed #3b82f6;
+            width: 80%;
+            height: 60%;
+            border: 2px dashed #06b6d4;
             border-radius: 8px;
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
             animation: pulse 2s infinite;
         }
         @keyframes pulse {
-            0%, 100% { border-color: #3b82f6; }
-            50% { border-color: #60a5fa; }
+            0%, 100% { border-color: #06b6d4; box-shadow: 0 0 10px rgba(6, 182, 212, 0.3); }
+            50% { border-color: #22d3ee; box-shadow: 0 0 20px rgba(34, 211, 238, 0.6); }
         }
-        /* Custom scrollbars */
         ::-webkit-scrollbar {
             width: 6px;
             height: 6px;
         }
         ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
+            background: #334155;
             border-radius: 3px;
         }
     </style>
 </head>
-<body class="bg-slate-100 min-h-screen text-slate-800 pb-12">
+<body class="bg-slate-900 min-h-screen text-slate-100 pb-12">
 
     <!-- Header -->
-    <header class="bg-indigo-700 text-white shadow-md sticky top-0 z-30">
+    <header class="bg-slate-800/90 backdrop-blur border-b border-slate-700 text-white sticky top-0 z-30">
         <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
-            <div class="flex items-center space-x-2">
-                <i class="fa-solid me-1 fa-qrcode text-xl text-indigo-200"></i>
-                <h1 class="font-bold text-lg leading-tight">Calendar Docket Scanner</h1>
+            <div class="flex items-center space-x-2.5">
+                <div class="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
+                    <i class="fa-solid fa-qrcode"></i>
+                </div>
+                <h1 class="font-bold text-base sm:text-lg tracking-wide text-cyan-400">Calendar Docket Scanner</h1>
             </div>
-            <div id="connectionStatus" class="flex items-center space-x-1 text-xs bg-indigo-800 px-2.5 py-1 rounded-full">
-                <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+            <div id="connectionStatus" class="flex items-center space-x-1.5 text-xs bg-slate-700/60 border border-slate-600 px-2.5 py-1 rounded-full text-emerald-400">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
                 <span>Offline Ready</span>
             </div>
         </div>
@@ -79,126 +80,139 @@
     <main class="max-w-4xl mx-auto px-4 py-4 space-y-5">
 
         <!-- Toast Notification Container -->
-        <div id="toast" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-4 py-2.5 rounded-lg text-sm shadow-xl z-50 transition-opacity duration-300 opacity-0 pointer-events-none flex items-center space-x-2">
-            <i id="toastIcon" class="fa-solid fa-circle-info text-indigo-400"></i>
+        <div id="toast" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-slate-800 border border-slate-600 text-slate-100 px-4 py-2.5 rounded-xl text-sm shadow-2xl z-50 transition-opacity duration-300 opacity-0 pointer-events-none flex items-center space-x-2">
+            <i id="toastIcon" class="fa-solid fa-circle-info text-cyan-400"></i>
             <span id="toastMsg">Notification message</span>
         </div>
 
-        <!-- Scanner Camera Modal / Area -->
-        <div id="scannerContainer" class="hidden bg-slate-900 rounded-2xl p-3 shadow-lg relative text-white">
-            <div class="flex justify-between items-center mb-2 px-1">
-                <span id="scannerTitle" class="text-sm font-semibold text-indigo-300">Scanning Code...</span>
-                <button type="button" onclick="stopScanner()" class="text-slate-400 hover:text-white p-1">
-                    <i class="fa-solid fa-xmark text-lg"></i>
-                </button>
-            </div>
-            <div class="scanner-viewport h-64 sm:h-80 relative">
-                <video id="videoPreview" playsinline></video>
-                <div class="scan-overlay">
-                    <div class="scan-box"></div>
-                </div>
-            </div>
-            <div class="mt-2 text-center text-xs text-slate-400">
-                Align code inside frame. Scanning works automatically.
-            </div>
-        </div>
-
         <!-- Main Form Section -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 space-y-4">
-            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
-                <h2 class="font-semibold text-slate-700 flex items-center gap-2">
-                    <i class="fa-solid fa-file-pen text-indigo-600"></i> Docket Information
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-xl p-4 sm:p-6 space-y-4">
+            <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-700/80 pb-3">
+                <h2 class="font-semibold text-cyan-400 flex items-center gap-2">
+                    <i class="fa-solid fa-file-pen"></i> Docket Information
                 </h2>
-                <button type="button" onclick="startScanner('QR')" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-sm transition">
+                <button type="button" onclick="toggleScanner('QR')" class="bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700 text-white text-xs font-semibold px-3.5 py-2 rounded-xl flex items-center gap-2 shadow-md transition">
                     <i class="fa-solid fa-qrcode"></i>
                     <span>Scan Details QR</span>
                 </button>
+            </div>
+
+            <!-- In-line Scanner Viewport for QR Scanner -->
+            <div id="qrScannerContainer" class="hidden bg-slate-950 border border-cyan-500/40 rounded-xl p-3 text-white space-y-2">
+                <div class="flex justify-between items-center px-1">
+                    <span class="text-xs font-medium text-cyan-400 flex items-center gap-1.5">
+                        <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span> Scanning QR Code...
+                    </span>
+                    <button type="button" onclick="stopScanner()" class="text-slate-400 hover:text-white px-2 py-0.5">
+                        <i class="fa-solid fa-xmark text-sm"></i> Close
+                    </button>
+                </div>
+                <div class="scanner-viewport h-52 sm:h-64 relative">
+                    <video id="qrVideoPreview" playsinline></video>
+                    <div class="scan-overlay"><div class="scan-box"></div></div>
+                </div>
             </div>
 
             <form id="docketForm" class="space-y-4" onsubmit="event.preventDefault(); saveEntry();">
                 <!-- Parsed Details Grid -->
                 <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Type (TYP)</label>
-                        <input type="text" id="inputTyp" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="e.g. Express / Standard" required oninput="updateImageFileName()">
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Type (TYP)</label>
+                        <input type="text" id="inputTyp" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 focus:outline-none" placeholder="e.g. Express / Standard" required oninput="updateImageFileName()">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Company Name (COMP)</label>
-                        <input type="text" id="inputComp" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Company Name" required oninput="updateImageFileName()">
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Company Name (COMP)</label>
+                        <input type="text" id="inputComp" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 focus:outline-none" placeholder="Company Name" required oninput="updateImageFileName()">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Contact Person (CONT)</label>
-                        <input type="text" id="inputCont" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Contact Name" required oninput="updateImageFileName()">
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Contact Person (CONT)</label>
+                        <input type="text" id="inputCont" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 focus:outline-none" placeholder="Contact Name" required oninput="updateImageFileName()">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Contact No (PH)</label>
-                        <input type="tel" id="inputPh" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Phone Number">
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Contact No (PH)</label>
+                        <input type="tel" id="inputPh" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 focus:outline-none" placeholder="Phone Number">
                     </div>
                     <div class="sm:col-span-2">
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Address (ADDR)</label>
-                        <input type="text" id="inputAddr" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Street / Building / Area">
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Address (ADDR)</label>
+                        <input type="text" id="inputAddr" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 focus:outline-none" placeholder="Street / Building / Area">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">City-Pin;State (CPS)</label>
-                        <input type="text" id="inputCps" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="e.g. Mumbai-400001;MH">
+                        <label class="block text-xs font-medium text-slate-300 mb-1">City-Pin;State (CPS)</label>
+                        <input type="text" id="inputCps" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 focus:outline-none" placeholder="e.g. Mumbai-400001;MH">
                     </div>
                     <div>
-                        <label class="block text-xs font-semibold text-slate-600 mb-1">Region (REG)</label>
-                        <input type="text" id="inputReg" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="e.g. West / North">
+                        <label class="block text-xs font-medium text-slate-300 mb-1">Region (REG)</label>
+                        <input type="text" id="inputReg" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 focus:outline-none" placeholder="e.g. West / North">
                     </div>
                 </div>
 
                 <!-- Courier Docket Barcode Field -->
-                <div class="pt-2 border-t border-slate-100">
-                    <label class="block text-xs font-semibold text-slate-600 mb-1">Courier Docket Number</label>
+                <div class="pt-2 border-t border-slate-700/80 space-y-2">
+                    <label class="block text-xs font-medium text-slate-300">Courier Docket Number</label>
                     <div class="flex gap-2">
-                        <input type="text" id="inputDocket" class="w-full px-3 py-2 text-sm font-mono border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none uppercase" placeholder="Enter or scan Docket No." required>
-                        <button type="button" onclick="startScanner('DOCKET')" class="bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 shrink-0 transition">
+                        <input type="text" id="inputDocket" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 font-mono focus:ring-2 focus:ring-cyan-500 focus:outline-none uppercase" placeholder="Enter or scan Docket No." required>
+                        <button type="button" onclick="toggleScanner('DOCKET')" class="bg-slate-700 hover:bg-slate-600 text-cyan-300 px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 shrink-0 border border-slate-600 transition">
                             <i class="fa-solid fa-barcode"></i>
                             <span>Scan Docket</span>
                         </button>
                     </div>
+
+                    <!-- In-line Scanner Viewport for Docket Barcode Scanner -->
+                    <div id="docketScannerContainer" class="hidden bg-slate-950 border border-cyan-500/40 rounded-xl p-3 text-white space-y-2">
+                        <div class="flex justify-between items-center px-1">
+                            <span class="text-xs font-medium text-cyan-400 flex items-center gap-1.5">
+                                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span> Scanning Docket Barcode...
+                            </span>
+                            <button type="button" onclick="stopScanner()" class="text-slate-400 hover:text-white px-2 py-0.5">
+                                <i class="fa-solid fa-xmark text-sm"></i> Close
+                            </button>
+                        </div>
+                        <div class="scanner-viewport h-48 sm:h-56 relative">
+                            <video id="docketVideoPreview" playsinline></video>
+                            <div class="scan-overlay"><div class="scan-box"></div></div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Package Picture Capture Section -->
-                <div class="pt-2 border-t border-slate-100 space-y-2">
-                    <label class="block text-xs font-semibold text-slate-600">Package Picture (3 - 5 MB original capacity, auto-compressed)</label>
+                <div class="pt-2 border-t border-slate-700/80 space-y-2">
+                    <label class="block text-xs font-medium text-slate-300">Package Picture (Auto compressed)</label>
                     
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
                         <div class="sm:col-span-2">
-                            <label class="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-slate-300 rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition">
+                            <label class="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-slate-700 rounded-xl cursor-pointer bg-slate-900 hover:bg-slate-900/80 hover:border-slate-600 transition">
                                 <div class="flex flex-col items-center justify-center pt-2 pb-2">
                                     <i class="fa-solid fa-camera text-slate-400 text-xl mb-1"></i>
-                                    <p class="text-xs text-slate-500 font-medium">Take photo or upload file</p>
-                                    <p class="text-[10px] text-slate-400 mt-0.5">JPG / PNG supported</p>
+                                    <p class="text-xs text-slate-300 font-medium">Take photo or upload image</p>
+                                    <p class="text-[10px] text-slate-500 mt-0.5">JPG / PNG supported</p>
                                 </div>
                                 <input id="cameraInput" type="file" accept="image/*" capture="environment" class="hidden" onchange="handleImageCapture(event)" />
                             </label>
                         </div>
 
                         <!-- Image Preview Box -->
-                        <div id="imagePreviewWrapper" class="h-24 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center relative overflow-hidden hidden">
+                        <div id="imagePreviewWrapper" class="h-24 bg-slate-900 rounded-xl border border-slate-700 flex items-center justify-center relative overflow-hidden hidden">
                             <img id="imagePreview" src="" alt="Package Preview" class="w-full h-full object-cover">
-                            <button type="button" onclick="clearImage()" class="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] shadow">
+                            <button type="button" onclick="clearImage()" class="absolute top-1 right-1 bg-rose-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] shadow">
                                 <i class="fa-solid fa-xmark"></i>
                             </button>
                         </div>
                     </div>
 
                     <!-- Auto-Generated File Name Banner -->
-                    <div class="bg-indigo-50 border border-indigo-100 rounded-lg p-2.5 text-xs text-indigo-900 flex items-center justify-between">
-                        <span class="font-medium text-slate-600">Auto File Name:</span>
-                        <span id="generatedFileName" class="font-mono font-bold text-indigo-700 truncate max-w-[220px] sm:max-w-xs">_ _ .jpg</span>
+                    <div class="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-300 flex items-center justify-between">
+                        <span class="font-medium text-slate-400">Photo File Name:</span>
+                        <span id="generatedFileName" class="font-mono font-semibold text-cyan-400 truncate max-w-[220px] sm:max-w-xs">_ _ .jpg</span>
                     </div>
                 </div>
 
                 <!-- Form Actions -->
                 <div class="pt-3 flex gap-2">
-                    <button type="submit" id="saveBtn" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl text-sm font-semibold shadow-md flex items-center justify-center gap-2 transition">
+                    <button type="submit" id="saveBtn" class="flex-1 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white py-2.5 rounded-xl text-sm font-semibold shadow-lg flex items-center justify-center gap-2 transition">
                         <i class="fa-solid fa-floppy-disk"></i>
                         <span>Save Details</span>
                     </button>
-                    <button type="button" onclick="resetForm()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-medium transition">
+                    <button type="button" onclick="resetForm()" class="bg-slate-700 hover:bg-slate-600 text-slate-200 px-4 py-2.5 rounded-xl text-sm font-medium transition">
                         Clear
                     </button>
                 </div>
@@ -206,32 +220,47 @@
         </div>
 
         <!-- Saved Records Section -->
-        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 space-y-4">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
-                <div class="flex items-center space-x-2">
-                    <h2 class="font-semibold text-slate-800 flex items-center gap-2">
-                        <i class="fa-solid fa-list-check text-indigo-600"></i> Saved Scans
-                    </h2>
-                    <span id="recordCount" class="bg-indigo-100 text-indigo-800 text-xs font-bold px-2 py-0.5 rounded-full">0</span>
+        <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-xl p-4 sm:p-6 space-y-4">
+            <!-- Header & Date Picker Filter Controls -->
+            <div class="flex flex-col space-y-3 border-b border-slate-700/80 pb-3">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div class="flex items-center space-x-2">
+                        <h2 class="font-semibold text-cyan-400 flex items-center gap-2">
+                            <i class="fa-solid fa-list-check"></i> Saved Scans
+                        </h2>
+                        <span id="recordCount" class="bg-cyan-950 text-cyan-400 border border-cyan-800 text-xs font-bold px-2.5 py-0.5 rounded-full">0</span>
+                    </div>
+
+                    <div class="flex items-center gap-2">
+                        <button type="button" onclick="exportDataZip()" class="bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow transition">
+                            <i class="fa-solid fa-share-nodes"></i>
+                            <span>Share Zip</span>
+                        </button>
+                        <button type="button" onclick="clearAllData()" class="text-rose-400 hover:bg-rose-950/50 p-2 rounded-lg transition" title="Delete All">
+                            <i class="fa-solid fa-trash-can text-sm"></i>
+                        </button>
+                    </div>
                 </div>
 
-                <div class="flex items-center gap-2">
-                    <button type="button" onclick="exportDataZip()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-sm transition">
-                        <i class="fa-solid fa-share-nodes"></i>
-                        <span>Share Zip Package</span>
-                    </button>
-                    <button type="button" onclick="clearAllData()" class="text-rose-600 hover:bg-rose-50 text-xs font-medium px-2.5 py-2 rounded-lg transition">
-                        <i class="fa-solid fa-trash-can"></i>
-                    </button>
+                <!-- Date Picker Filter -->
+                <div class="flex flex-wrap items-center justify-between bg-slate-900 border border-slate-700 rounded-xl p-2.5 gap-2">
+                    <div class="flex items-center space-x-2 w-full sm:w-auto">
+                        <i class="fa-solid fa-calendar-day text-cyan-400 text-xs"></i>
+                        <span class="text-xs font-medium text-slate-300">Filter Date:</span>
+                        <input type="date" id="dateFilter" class="bg-slate-800 border border-slate-700 text-slate-100 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-cyan-500" onchange="loadSavedRecords()">
+                    </div>
+                    <div class="flex items-center space-x-2">
+                        <button type="button" onclick="setFilterToday()" class="text-[11px] font-medium bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2.5 py-1 rounded-lg text-slate-300">Today</button>
+                        <button type="button" onclick="clearDateFilter()" class="text-[11px] font-medium bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2.5 py-1 rounded-lg text-slate-300">All Dates</button>
+                    </div>
                 </div>
             </div>
 
             <!-- List Display Container -->
             <div id="recordsList" class="space-y-3">
-                <!-- Dynamically populated or empty state -->
-                <div class="text-center py-8 text-slate-400 text-sm">
-                    <i class="fa-solid fa-box-open text-3xl mb-2 text-slate-300"></i>
-                    <p>No docket entries saved yet.</p>
+                <div class="text-center py-8 text-slate-500 text-sm">
+                    <i class="fa-solid fa-box-open text-3xl mb-2 text-slate-600"></i>
+                    <p>No docket entries saved for selected date.</p>
                 </div>
             </div>
         </div>
@@ -247,7 +276,7 @@
         let editingId = null;
         let currentPictureBase64 = null;
 
-        // Initialize IndexedDB
+        // Initialize DB
         function initDB() {
             return new Promise((resolve, reject) => {
                 const request = indexedDB.open('CalendarDocketDB', 1);
@@ -265,9 +294,18 @@
             });
         }
 
+        function getTodayDateString() {
+            const today = new Date();
+            const year = today.getFullYear();
+            const month = String(today.getMonth() + 1).padStart(2, '0');
+            const day = String(today.getDate()).padStart(2, '0');
+            return `${year}-${month}-${day}`;
+        }
+
         window.onload = async () => {
             try {
                 await initDB();
+                document.getElementById('dateFilter').value = getTodayDateString();
                 loadSavedRecords();
                 updateImageFileName();
             } catch (err) {
@@ -275,7 +313,6 @@
             }
         };
 
-        // Utility Toast function
         function showToast(message, type = 'info') {
             const toast = document.getElementById('toast');
             const toastMsg = document.getElementById('toastMsg');
@@ -287,7 +324,7 @@
             } else if (type === 'success') {
                 toastIcon.className = "fa-solid fa-circle-check text-emerald-400";
             } else {
-                toastIcon.className = "fa-solid fa-circle-info text-indigo-400";
+                toastIcon.className = "fa-solid fa-circle-info text-cyan-400";
             }
 
             toast.classList.remove('opacity-0', 'pointer-events-none');
@@ -298,30 +335,35 @@
             }, 3000);
         }
 
-        // --- CAMERA & BARCODE DETECTOR LOGIC ---
-        async function startScanner(mode) {
-            currentScanMode = mode;
-            const container = document.getElementById('scannerContainer');
-            const title = document.getElementById('scannerTitle');
-            title.innerText = mode === 'QR' ? 'Scanning Details QR Code...' : 'Scanning Docket Barcode...';
+        // --- IN-LINE CAMERA & BARCODE DETECTOR LOGIC ---
+        async function toggleScanner(mode) {
+            if (activeStream && currentScanMode === mode) {
+                stopScanner();
+                return;
+            }
+            stopScanner(); // Stop any active video stream first
             
-            container.classList.remove('hidden');
+            currentScanMode = mode;
+            const qrContainer = document.getElementById('qrScannerContainer');
+            const docketContainer = document.getElementById('docketScannerContainer');
+            const targetVideo = mode === 'QR' ? document.getElementById('qrVideoPreview') : document.getElementById('docketVideoPreview');
+
+            if (mode === 'QR') {
+                qrContainer.classList.remove('hidden');
+            } else {
+                docketContainer.classList.remove('hidden');
+            }
 
             try {
-                const constraints = {
-                    video: { facingMode: { exact: "environment" } }
-                };
+                const constraints = { video: { facingMode: { exact: "environment" } } };
                 try {
                     activeStream = await navigator.mediaDevices.getUserMedia(constraints);
                 } catch {
-                    // Fallback to default rear/user camera
                     activeStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 }
 
-                const video = document.getElementById('videoPreview');
-                video.srcObject = activeStream;
-                await video.play();
-
+                targetVideo.srcObject = activeStream;
+                await targetVideo.play();
                 requestAnimationFrame(scanFrame);
             } catch (err) {
                 showToast("Unable to access camera. Check permissions.", "error");
@@ -334,17 +376,21 @@
                 activeStream.getTracks().forEach(track => track.stop());
                 activeStream = null;
             }
-            document.getElementById('scannerContainer').classList.add('hidden');
+            document.getElementById('qrScannerContainer').classList.add('hidden');
+            document.getElementById('docketScannerContainer').classList.add('hidden');
+            currentScanMode = null;
         }
 
         async function scanFrame() {
-            const video = document.getElementById('videoPreview');
-            if (!activeStream || video.readyState !== video.HAVE_ENOUGH_DATA) {
+            const video = currentScanMode === 'QR' 
+                ? document.getElementById('qrVideoPreview') 
+                : document.getElementById('docketVideoPreview');
+
+            if (!activeStream || !video || video.readyState !== video.HAVE_ENOUGH_DATA) {
                 if (activeStream) requestAnimationFrame(scanFrame);
                 return;
             }
 
-            // Check Native Android / Web BarcodeDetector support
             if ('BarcodeDetector' in window) {
                 try {
                     const formats = currentScanMode === 'QR' ? ['qr_code'] : ['code_128', 'code_39', 'ean_13', 'upc_a', 'qr_code'];
@@ -360,13 +406,6 @@
                 } catch (e) {
                     console.warn("BarcodeDetector error: ", e);
                 }
-            } else {
-                // Canvas-based basic fallback reader if native API unsupported
-                const canvas = document.createElement('canvas');
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
-                const ctx = canvas.getContext('2d');
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             }
 
             if (activeStream) {
@@ -374,7 +413,6 @@
             }
         }
 
-        // Process Scanned Data
         function handleScannedCode(rawValue) {
             if (currentScanMode === 'QR') {
                 parseAndPopulateQR(rawValue);
@@ -385,10 +423,7 @@
             }
         }
 
-        // QR Code Key-Value Parser
         function parseAndPopulateQR(text) {
-            // Parses TYP=...,COMP=...,CONT=...,ADDR=...,PH=...,CPS=...,Reg=...
-            // Handles newline, comma, or semicolon delimiters
             const fields = {
                 TYP: 'inputTyp',
                 COMP: 'inputComp',
@@ -399,7 +434,6 @@
                 REG: 'inputReg'
             };
 
-            // Split string by common delimiters: comma, semicolon, newline
             const pairs = text.split(/[,;\n\r]+/);
             
             pairs.forEach(pair => {
@@ -408,7 +442,6 @@
                     const key = parts[0].trim().toUpperCase();
                     const val = parts.slice(1).join('=').trim();
 
-                    // Match key against mapping
                     for (let fKey in fields) {
                         if (key === fKey || key.startsWith(fKey)) {
                             const inputEl = document.getElementById(fields[fKey]);
@@ -427,13 +460,10 @@
             const comp = document.getElementById('inputComp').value.trim();
             const cont = document.getElementById('inputCont').value.trim();
 
-            // First word of Company
             const compFirstWord = comp ? comp.split(/\s+/)[0] : '';
-            // First 2 words of Contact Person
             const contWords = cont ? cont.split(/\s+/).slice(0, 2).join('') : '';
 
             let fileName = `${typ || 'Type'}_${compFirstWord || 'Company'}_${contWords || 'Contact'}.jpg`;
-            // Clean up invalid filename characters
             fileName = fileName.replace(/[^a-zA-Z0-9_\-\.]/g, '');
 
             document.getElementById('generatedFileName').innerText = fileName;
@@ -444,7 +474,6 @@
             const file = event.target.files[0];
             if (!file) return;
 
-            // Image size limit check & compression via canvas
             const reader = new FileReader();
             reader.onload = (e) => {
                 const img = new Image();
@@ -469,12 +498,11 @@
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, width, height);
 
-                    // Standard JPEG compression quality 0.8
                     currentPictureBase64 = canvas.toDataURL('image/jpeg', 0.8);
                     
                     document.getElementById('imagePreview').src = currentPictureBase64;
                     document.getElementById('imagePreviewWrapper').classList.remove('hidden');
-                    showToast("Picture loaded and compressed", "info");
+                    showToast("Picture attached & compressed", "info");
                 };
                 img.src = e.target.result;
             };
@@ -488,8 +516,21 @@
             document.getElementById('imagePreviewWrapper').classList.add('hidden');
         }
 
+        // --- DATE FILTER CONTROLS ---
+        function setFilterToday() {
+            document.getElementById('dateFilter').value = getTodayDateString();
+            loadSavedRecords();
+        }
+
+        function clearDateFilter() {
+            document.getElementById('dateFilter').value = '';
+            loadSavedRecords();
+        }
+
         // --- CRUD OPERATIONS ---
         async function saveEntry() {
+            const dateVal = getTodayDateString(); // YYYY-MM-DD
+            
             const record = {
                 typ: document.getElementById('inputTyp').value.trim(),
                 comp: document.getElementById('inputComp').value.trim(),
@@ -501,7 +542,7 @@
                 docket: document.getElementById('inputDocket').value.trim(),
                 pictureName: updateImageFileName(),
                 pictureData: currentPictureBase64,
-                timestamp: new Date().toLocaleString()
+                entryDate: dateVal // YYYY-MM-DD date format
             };
 
             const transaction = db.transaction(['dockets'], 'readwrite');
@@ -520,13 +561,40 @@
             loadSavedRecords();
         }
 
+        // Sort Helper: Sort by Customer / Company Name primary, Contact Person Name secondary
+        function sortRecords(records) {
+            return records.sort((a, b) => {
+                const compA = (a.comp || '').toLowerCase();
+                const compB = (b.comp || '').toLowerCase();
+                if (compA < compB) return -1;
+                if (compA > compB) return 1;
+
+                const contA = (a.cont || '').toLowerCase();
+                const contB = (b.cont || '').toLowerCase();
+                if (contA < contB) return -1;
+                if (contA > contB) return 1;
+                return 0;
+            });
+        }
+
         function loadSavedRecords() {
             const transaction = db.transaction(['dockets'], 'readonly');
             const store = transaction.objectStore('dockets');
             const request = store.getAll();
 
+            const filterDate = document.getElementById('dateFilter').value;
+
             request.onsuccess = () => {
-                const records = request.result;
+                let records = request.result;
+
+                // Filter by selected date if date filter is set
+                if (filterDate) {
+                    records = records.filter(r => r.entryDate === filterDate);
+                }
+
+                // Sort by Company Name then Contact Person Name
+                records = sortRecords(records);
+
                 document.getElementById('recordCount').innerText = records.length;
                 renderRecordsList(records);
             };
@@ -536,35 +604,36 @@
             const container = document.getElementById('recordsList');
             if (records.length === 0) {
                 container.innerHTML = `
-                    <div class="text-center py-8 text-slate-400 text-sm">
-                        <i class="fa-solid fa-box-open text-3xl mb-2 text-slate-300"></i>
-                        <p>No docket entries saved yet.</p>
+                    <div class="text-center py-8 text-slate-500 text-sm">
+                        <i class="fa-solid fa-box-open text-3xl mb-2 text-slate-600"></i>
+                        <p>No docket entries found for selected date.</p>
                     </div>`;
                 return;
             }
 
             container.innerHTML = records.map(rec => `
-                <div class="border border-slate-200 rounded-xl p-3 bg-slate-50 flex flex-col sm:flex-row gap-3 justify-between items-start">
+                <div class="border border-slate-700/80 rounded-xl p-3 bg-slate-900 flex flex-col sm:flex-row gap-3 justify-between items-start">
                     <div class="flex gap-3 items-start w-full sm:w-auto">
                         ${rec.pictureData 
-                            ? `<img src="${rec.pictureData}" class="w-16 h-16 object-cover rounded-lg border border-slate-300 shrink-0">`
-                            : `<div class="w-16 h-16 bg-slate-200 rounded-lg flex items-center justify-center text-slate-400 text-xs shrink-0"><i class="fa-solid fa-image text-xl"></i></div>`
+                            ? `<img src="${rec.pictureData}" class="w-16 h-16 object-cover rounded-lg border border-slate-700 shrink-0">`
+                            : `<div class="w-16 h-16 bg-slate-800 border border-slate-700 rounded-lg flex items-center justify-center text-slate-500 text-xs shrink-0"><i class="fa-solid fa-image text-xl"></i></div>`
                         }
                         <div class="space-y-0.5 text-xs">
                             <div class="flex items-center gap-1.5 flex-wrap">
-                                <span class="font-bold text-slate-900 text-sm">${rec.docket || 'NO DOCKET'}</span>
-                                <span class="bg-indigo-100 text-indigo-800 text-[10px] font-semibold px-1.5 py-0.5 rounded">${rec.typ}</span>
+                                <span class="font-bold text-cyan-400 font-mono text-sm">${rec.docket || 'NO DOCKET'}</span>
+                                <span class="bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px] font-semibold px-1.5 py-0.5 rounded">${rec.typ}</span>
+                                <span class="text-[10px] text-slate-400 bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded">${rec.entryDate || ''}</span>
                             </div>
-                            <p class="font-medium text-slate-700">${rec.comp} (${rec.cont})</p>
-                            <p class="text-slate-500">${rec.addr ? rec.addr + ', ' : ''}${rec.cps || ''}</p>
-                            <p class="text-[10px] text-slate-400 font-mono mt-1"><i class="fa-solid fa-file-image me-1"></i>${rec.pictureName}</p>
+                            <p class="font-semibold text-slate-100 text-sm">${rec.comp} <span class="text-slate-400 font-normal">(${rec.cont})</span></p>
+                            <p class="text-slate-400">${rec.addr ? rec.addr + ', ' : ''}${rec.cps || ''}</p>
+                            <p class="text-[10px] text-slate-500 font-mono mt-1"><i class="fa-solid fa-file-image me-1"></i>Photos/${rec.pictureName}</p>
                         </div>
                     </div>
-                    <div class="flex sm:flex-col items-center justify-end gap-2 w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-200">
-                        <button onclick="editRecord(${rec.id})" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition">
+                    <div class="flex sm:flex-col items-center justify-end gap-2 w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-800">
+                        <button onclick="editRecord(${rec.id})" class="bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition">
                             <i class="fa-solid fa-pen-to-square"></i> Edit
                         </button>
-                        <button onclick="deleteRecord(${rec.id})" class="bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition">
+                        <button onclick="deleteRecord(${rec.id})" class="bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/60 text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition">
                             <i class="fa-solid fa-trash"></i> Delete
                         </button>
                     </div>
@@ -635,19 +704,31 @@
             const store = transaction.objectStore('dockets');
             const request = store.getAll();
 
+            const filterDate = document.getElementById('dateFilter').value;
+
             request.onsuccess = async () => {
-                const records = request.result;
+                let records = request.result;
+
+                if (filterDate) {
+                    records = records.filter(r => r.entryDate === filterDate);
+                }
+
                 if (records.length === 0) {
-                    showToast("No records available to export", "error");
+                    showToast("No records available to export for selected date", "error");
                     return;
                 }
+
+                // Sort by Company Name then Contact Person Name
+                records = sortRecords(records);
 
                 showToast("Building Zip Package...", "info");
 
                 const zip = new JSZip();
+                // Photos folder inside ZIP archive
+                const photosFolder = zip.folder("Photos");
 
-                // Generate CSV Header & Lines
-                const csvHeaders = ["ID", "Docket Number", "Type", "Company Name", "Contact Person", "Phone", "Address", "CPS", "Region", "Picture File Name", "Timestamp"];
+                // CSV Headers & Lines
+                const csvHeaders = ["ID", "Docket Number", "Type", "Company Name", "Contact Person", "Phone", "Address", "CPS", "Region", "Picture File Name", "Date"];
                 const csvRows = [csvHeaders.join(",")];
 
                 records.forEach((r, idx) => {
@@ -661,25 +742,24 @@
                         `"${(r.addr || '').replace(/"/g, '""')}"`,
                         `"${(r.cps || '').replace(/"/g, '""')}"`,
                         `"${(r.reg || '').replace(/"/g, '""')}"`,
-                        `"${r.pictureName}"`,
-                        `"${r.timestamp}"`
+                        `"Photos/${r.pictureName}"`,
+                        `"${r.entryDate || ''}"`
                     ];
                     csvRows.push(row.join(","));
 
-                    // Add Image file to Zip if present
+                    // Save image inside "Photos/" subfolder in Zip
                     if (r.pictureData && r.pictureData.includes(',')) {
                         const base64Data = r.pictureData.split(',')[1];
-                        zip.file(r.pictureName, base64Data, { base64: true });
+                        photosFolder.file(r.pictureName, base64Data, { base64: true });
                     }
                 });
 
                 zip.file("dockets.csv", csvRows.join("\n"));
 
-                // Generate Zip Blob
                 const zipContent = await zip.generateAsync({ type: "blob" });
-                const fileName = `Docket_Export_${new Date().toISOString().slice(0,10)}.zip`;
+                const fileName = `Docket_Export_${filterDate || 'All'}.zip`;
 
-                // Web Share API support (Android Native Share Sheet)
+                // Native Android Share Sheet via Web Share API
                 if (navigator.share && navigator.canShare) {
                     const file = new File([zipContent], fileName, { type: "application/zip" });
                     if (navigator.canShare({ files: [file] })) {
@@ -697,7 +777,7 @@
                     }
                 }
 
-                // Fallback Direct File Download
+                // Fallback direct download
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(zipContent);
                 link.download = fileName;
