@@ -1,0 +1,712 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Calendar Docket Number Scanner</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- JSZip for bundling CSV and Images into Zip -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <style>
+        /* Custom Mobile Adjustments */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f3f4f6;
+            touch-action: manipulation;
+        }
+        .scanner-viewport {
+            position: relative;
+            overflow: hidden;
+            border-radius: 12px;
+            background: #000;
+        }
+        .scanner-viewport video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .scan-overlay {
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            border: 2px solid rgba(59, 130, 246, 0.5);
+            box-shadow: inset 0 0 0 2000px rgba(0, 0, 0, 0.35);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .scan-box {
+            width: 75%;
+            height: 55%;
+            border: 2px dashed #3b82f6;
+            border-radius: 8px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { border-color: #3b82f6; }
+            50% { border-color: #60a5fa; }
+        }
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 3px;
+        }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 pb-12">
+
+    <!-- Header -->
+    <header class="bg-indigo-700 text-white shadow-md sticky top-0 z-30">
+        <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid me-1 fa-qrcode text-xl text-indigo-200"></i>
+                <h1 class="font-bold text-lg leading-tight">Calendar Docket Scanner</h1>
+            </div>
+            <div id="connectionStatus" class="flex items-center space-x-1 text-xs bg-indigo-800 px-2.5 py-1 rounded-full">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block"></span>
+                <span>Offline Ready</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4 py-4 space-y-5">
+
+        <!-- Toast Notification Container -->
+        <div id="toast" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-slate-900 text-white px-4 py-2.5 rounded-lg text-sm shadow-xl z-50 transition-opacity duration-300 opacity-0 pointer-events-none flex items-center space-x-2">
+            <i id="toastIcon" class="fa-solid fa-circle-info text-indigo-400"></i>
+            <span id="toastMsg">Notification message</span>
+        </div>
+
+        <!-- Scanner Camera Modal / Area -->
+        <div id="scannerContainer" class="hidden bg-slate-900 rounded-2xl p-3 shadow-lg relative text-white">
+            <div class="flex justify-between items-center mb-2 px-1">
+                <span id="scannerTitle" class="text-sm font-semibold text-indigo-300">Scanning Code...</span>
+                <button type="button" onclick="stopScanner()" class="text-slate-400 hover:text-white p-1">
+                    <i class="fa-solid fa-xmark text-lg"></i>
+                </button>
+            </div>
+            <div class="scanner-viewport h-64 sm:h-80 relative">
+                <video id="videoPreview" playsinline></video>
+                <div class="scan-overlay">
+                    <div class="scan-box"></div>
+                </div>
+            </div>
+            <div class="mt-2 text-center text-xs text-slate-400">
+                Align code inside frame. Scanning works automatically.
+            </div>
+        </div>
+
+        <!-- Main Form Section -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-100 pb-3">
+                <h2 class="font-semibold text-slate-700 flex items-center gap-2">
+                    <i class="fa-solid fa-file-pen text-indigo-600"></i> Docket Information
+                </h2>
+                <button type="button" onclick="startScanner('QR')" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-medium px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-sm transition">
+                    <i class="fa-solid fa-qrcode"></i>
+                    <span>Scan Details QR</span>
+                </button>
+            </div>
+
+            <form id="docketForm" class="space-y-4" onsubmit="event.preventDefault(); saveEntry();">
+                <!-- Parsed Details Grid -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Type (TYP)</label>
+                        <input type="text" id="inputTyp" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="e.g. Express / Standard" required oninput="updateImageFileName()">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Company Name (COMP)</label>
+                        <input type="text" id="inputComp" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Company Name" required oninput="updateImageFileName()">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Contact Person (CONT)</label>
+                        <input type="text" id="inputCont" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Contact Name" required oninput="updateImageFileName()">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Contact No (PH)</label>
+                        <input type="tel" id="inputPh" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Phone Number">
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Address (ADDR)</label>
+                        <input type="text" id="inputAddr" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="Street / Building / Area">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">City-Pin;State (CPS)</label>
+                        <input type="text" id="inputCps" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="e.g. Mumbai-400001;MH">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-600 mb-1">Region (REG)</label>
+                        <input type="text" id="inputReg" class="w-full px-3 py-2 text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none" placeholder="e.g. West / North">
+                    </div>
+                </div>
+
+                <!-- Courier Docket Barcode Field -->
+                <div class="pt-2 border-t border-slate-100">
+                    <label class="block text-xs font-semibold text-slate-600 mb-1">Courier Docket Number</label>
+                    <div class="flex gap-2">
+                        <input type="text" id="inputDocket" class="w-full px-3 py-2 text-sm font-mono border border-slate-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:outline-none uppercase" placeholder="Enter or scan Docket No." required>
+                        <button type="button" onclick="startScanner('DOCKET')" class="bg-slate-800 hover:bg-slate-900 text-white px-3.5 py-2 rounded-lg text-xs font-medium flex items-center gap-1.5 shrink-0 transition">
+                            <i class="fa-solid fa-barcode"></i>
+                            <span>Scan Docket</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Package Picture Capture Section -->
+                <div class="pt-2 border-t border-slate-100 space-y-2">
+                    <label class="block text-xs font-semibold text-slate-600">Package Picture (3 - 5 MB original capacity, auto-compressed)</label>
+                    
+                    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
+                        <div class="sm:col-span-2">
+                            <label class="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-slate-300 rounded-xl cursor-pointer bg-slate-50 hover:bg-slate-100 transition">
+                                <div class="flex flex-col items-center justify-center pt-2 pb-2">
+                                    <i class="fa-solid fa-camera text-slate-400 text-xl mb-1"></i>
+                                    <p class="text-xs text-slate-500 font-medium">Take photo or upload file</p>
+                                    <p class="text-[10px] text-slate-400 mt-0.5">JPG / PNG supported</p>
+                                </div>
+                                <input id="cameraInput" type="file" accept="image/*" capture="environment" class="hidden" onchange="handleImageCapture(event)" />
+                            </label>
+                        </div>
+
+                        <!-- Image Preview Box -->
+                        <div id="imagePreviewWrapper" class="h-24 bg-slate-100 rounded-xl border border-slate-200 flex items-center justify-center relative overflow-hidden hidden">
+                            <img id="imagePreview" src="" alt="Package Preview" class="w-full h-full object-cover">
+                            <button type="button" onclick="clearImage()" class="absolute top-1 right-1 bg-red-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] shadow">
+                                <i class="fa-solid fa-xmark"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Auto-Generated File Name Banner -->
+                    <div class="bg-indigo-50 border border-indigo-100 rounded-lg p-2.5 text-xs text-indigo-900 flex items-center justify-between">
+                        <span class="font-medium text-slate-600">Auto File Name:</span>
+                        <span id="generatedFileName" class="font-mono font-bold text-indigo-700 truncate max-w-[220px] sm:max-w-xs">_ _ .jpg</span>
+                    </div>
+                </div>
+
+                <!-- Form Actions -->
+                <div class="pt-3 flex gap-2">
+                    <button type="submit" id="saveBtn" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white py-2.5 rounded-xl text-sm font-semibold shadow-md flex items-center justify-center gap-2 transition">
+                        <i class="fa-solid fa-floppy-disk"></i>
+                        <span>Save Details</span>
+                    </button>
+                    <button type="button" onclick="resetForm()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2.5 rounded-xl text-sm font-medium transition">
+                        Clear
+                    </button>
+                </div>
+            </form>
+        </div>
+
+        <!-- Saved Records Section -->
+        <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-4 sm:p-6 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div class="flex items-center space-x-2">
+                    <h2 class="font-semibold text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-indigo-600"></i> Saved Scans
+                    </h2>
+                    <span id="recordCount" class="bg-indigo-100 text-indigo-800 text-xs font-bold px-2 py-0.5 rounded-full">0</span>
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <button type="button" onclick="exportDataZip()" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow-sm transition">
+                        <i class="fa-solid fa-share-nodes"></i>
+                        <span>Share Zip Package</span>
+                    </button>
+                    <button type="button" onclick="clearAllData()" class="text-rose-600 hover:bg-rose-50 text-xs font-medium px-2.5 py-2 rounded-lg transition">
+                        <i class="fa-solid fa-trash-can"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- List Display Container -->
+            <div id="recordsList" class="space-y-3">
+                <!-- Dynamically populated or empty state -->
+                <div class="text-center py-8 text-slate-400 text-sm">
+                    <i class="fa-solid fa-box-open text-3xl mb-2 text-slate-300"></i>
+                    <p>No docket entries saved yet.</p>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- IndexedDB & App Logic -->
+    <script>
+        // Global State & Database
+        let db = null;
+        let activeStream = null;
+        let currentScanMode = null; // 'QR' or 'DOCKET'
+        let editingId = null;
+        let currentPictureBase64 = null;
+
+        // Initialize IndexedDB
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open('CalendarDocketDB', 1);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains('dockets')) {
+                        db.createObjectStore('dockets', { keyPath: 'id', autoIncrement: true });
+                    }
+                };
+                request.onsuccess = (e) => {
+                    db = e.target.result;
+                    resolve(db);
+                };
+                request.onerror = (e) => reject(e);
+            });
+        }
+
+        window.onload = async () => {
+            try {
+                await initDB();
+                loadSavedRecords();
+                updateImageFileName();
+            } catch (err) {
+                showToast("Database initialization error", "error");
+            }
+        };
+
+        // Utility Toast function
+        function showToast(message, type = 'info') {
+            const toast = document.getElementById('toast');
+            const toastMsg = document.getElementById('toastMsg');
+            const toastIcon = document.getElementById('toastIcon');
+
+            toastMsg.innerText = message;
+            if (type === 'error') {
+                toastIcon.className = "fa-solid fa-triangle-exclamation text-rose-400";
+            } else if (type === 'success') {
+                toastIcon.className = "fa-solid fa-circle-check text-emerald-400";
+            } else {
+                toastIcon.className = "fa-solid fa-circle-info text-indigo-400";
+            }
+
+            toast.classList.remove('opacity-0', 'pointer-events-none');
+            toast.classList.add('opacity-100');
+            setTimeout(() => {
+                toast.classList.remove('opacity-100');
+                toast.classList.add('opacity-0', 'pointer-events-none');
+            }, 3000);
+        }
+
+        // --- CAMERA & BARCODE DETECTOR LOGIC ---
+        async function startScanner(mode) {
+            currentScanMode = mode;
+            const container = document.getElementById('scannerContainer');
+            const title = document.getElementById('scannerTitle');
+            title.innerText = mode === 'QR' ? 'Scanning Details QR Code...' : 'Scanning Docket Barcode...';
+            
+            container.classList.remove('hidden');
+
+            try {
+                const constraints = {
+                    video: { facingMode: { exact: "environment" } }
+                };
+                try {
+                    activeStream = await navigator.mediaDevices.getUserMedia(constraints);
+                } catch {
+                    // Fallback to default rear/user camera
+                    activeStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                }
+
+                const video = document.getElementById('videoPreview');
+                video.srcObject = activeStream;
+                await video.play();
+
+                requestAnimationFrame(scanFrame);
+            } catch (err) {
+                showToast("Unable to access camera. Check permissions.", "error");
+                stopScanner();
+            }
+        }
+
+        function stopScanner() {
+            if (activeStream) {
+                activeStream.getTracks().forEach(track => track.stop());
+                activeStream = null;
+            }
+            document.getElementById('scannerContainer').classList.add('hidden');
+        }
+
+        async function scanFrame() {
+            const video = document.getElementById('videoPreview');
+            if (!activeStream || video.readyState !== video.HAVE_ENOUGH_DATA) {
+                if (activeStream) requestAnimationFrame(scanFrame);
+                return;
+            }
+
+            // Check Native Android / Web BarcodeDetector support
+            if ('BarcodeDetector' in window) {
+                try {
+                    const formats = currentScanMode === 'QR' ? ['qr_code'] : ['code_128', 'code_39', 'ean_13', 'upc_a', 'qr_code'];
+                    const barcodeDetector = new BarcodeDetector({ formats });
+                    const barcodes = await barcodeDetector.detect(video);
+                    
+                    if (barcodes.length > 0) {
+                        const rawValue = barcodes[0].rawValue;
+                        handleScannedCode(rawValue);
+                        stopScanner();
+                        return;
+                    }
+                } catch (e) {
+                    console.warn("BarcodeDetector error: ", e);
+                }
+            } else {
+                // Canvas-based basic fallback reader if native API unsupported
+                const canvas = document.createElement('canvas');
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            }
+
+            if (activeStream) {
+                setTimeout(() => requestAnimationFrame(scanFrame), 200);
+            }
+        }
+
+        // Process Scanned Data
+        function handleScannedCode(rawValue) {
+            if (currentScanMode === 'QR') {
+                parseAndPopulateQR(rawValue);
+                showToast("QR details parsed successfully!", "success");
+            } else if (currentScanMode === 'DOCKET') {
+                document.getElementById('inputDocket').value = rawValue.trim();
+                showToast("Docket number captured!", "success");
+            }
+        }
+
+        // QR Code Key-Value Parser
+        function parseAndPopulateQR(text) {
+            // Parses TYP=...,COMP=...,CONT=...,ADDR=...,PH=...,CPS=...,Reg=...
+            // Handles newline, comma, or semicolon delimiters
+            const fields = {
+                TYP: 'inputTyp',
+                COMP: 'inputComp',
+                CONT: 'inputCont',
+                ADDR: 'inputAddr',
+                PH: 'inputPh',
+                CPS: 'inputCps',
+                REG: 'inputReg'
+            };
+
+            // Split string by common delimiters: comma, semicolon, newline
+            const pairs = text.split(/[,;\n\r]+/);
+            
+            pairs.forEach(pair => {
+                const parts = pair.split('=');
+                if (parts.length >= 2) {
+                    const key = parts[0].trim().toUpperCase();
+                    const val = parts.slice(1).join('=').trim();
+
+                    // Match key against mapping
+                    for (let fKey in fields) {
+                        if (key === fKey || key.startsWith(fKey)) {
+                            const inputEl = document.getElementById(fields[fKey]);
+                            if (inputEl) inputEl.value = val;
+                        }
+                    }
+                }
+            });
+
+            updateImageFileName();
+        }
+
+        // --- PICTURE HANDLING & AUTO-NAMING ---
+        function updateImageFileName() {
+            const typ = document.getElementById('inputTyp').value.trim();
+            const comp = document.getElementById('inputComp').value.trim();
+            const cont = document.getElementById('inputCont').value.trim();
+
+            // First word of Company
+            const compFirstWord = comp ? comp.split(/\s+/)[0] : '';
+            // First 2 words of Contact Person
+            const contWords = cont ? cont.split(/\s+/).slice(0, 2).join('') : '';
+
+            let fileName = `${typ || 'Type'}_${compFirstWord || 'Company'}_${contWords || 'Contact'}.jpg`;
+            // Clean up invalid filename characters
+            fileName = fileName.replace(/[^a-zA-Z0-9_\-\.]/g, '');
+
+            document.getElementById('generatedFileName').innerText = fileName;
+            return fileName;
+        }
+
+        function handleImageCapture(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            // Image size limit check & compression via canvas
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+                    const maxDim = 1200;
+
+                    if (width > maxDim || height > maxDim) {
+                        if (width > height) {
+                            height = Math.round((height * maxDim) / width);
+                            width = maxDim;
+                        } else {
+                            width = Math.round((width * maxDim) / height);
+                            height = maxDim;
+                        }
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    // Standard JPEG compression quality 0.8
+                    currentPictureBase64 = canvas.toDataURL('image/jpeg', 0.8);
+                    
+                    document.getElementById('imagePreview').src = currentPictureBase64;
+                    document.getElementById('imagePreviewWrapper').classList.remove('hidden');
+                    showToast("Picture loaded and compressed", "info");
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function clearImage() {
+            currentPictureBase64 = null;
+            document.getElementById('cameraInput').value = '';
+            document.getElementById('imagePreview').src = '';
+            document.getElementById('imagePreviewWrapper').classList.add('hidden');
+        }
+
+        // --- CRUD OPERATIONS ---
+        async function saveEntry() {
+            const record = {
+                typ: document.getElementById('inputTyp').value.trim(),
+                comp: document.getElementById('inputComp').value.trim(),
+                cont: document.getElementById('inputCont').value.trim(),
+                ph: document.getElementById('inputPh').value.trim(),
+                addr: document.getElementById('inputAddr').value.trim(),
+                cps: document.getElementById('inputCps').value.trim(),
+                reg: document.getElementById('inputReg').value.trim(),
+                docket: document.getElementById('inputDocket').value.trim(),
+                pictureName: updateImageFileName(),
+                pictureData: currentPictureBase64,
+                timestamp: new Date().toLocaleString()
+            };
+
+            const transaction = db.transaction(['dockets'], 'readwrite');
+            const store = transaction.objectStore('dockets');
+
+            if (editingId) {
+                record.id = editingId;
+                await store.put(record);
+                showToast("Docket record updated!", "success");
+            } else {
+                await store.add(record);
+                showToast("New docket record saved!", "success");
+            }
+
+            resetForm();
+            loadSavedRecords();
+        }
+
+        function loadSavedRecords() {
+            const transaction = db.transaction(['dockets'], 'readonly');
+            const store = transaction.objectStore('dockets');
+            const request = store.getAll();
+
+            request.onsuccess = () => {
+                const records = request.result;
+                document.getElementById('recordCount').innerText = records.length;
+                renderRecordsList(records);
+            };
+        }
+
+        function renderRecordsList(records) {
+            const container = document.getElementById('recordsList');
+            if (records.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 text-slate-400 text-sm">
+                        <i class="fa-solid fa-box-open text-3xl mb-2 text-slate-300"></i>
+                        <p>No docket entries saved yet.</p>
+                    </div>`;
+                return;
+            }
+
+            container.innerHTML = records.map(rec => `
+                <div class="border border-slate-200 rounded-xl p-3 bg-slate-50 flex flex-col sm:flex-row gap-3 justify-between items-start">
+                    <div class="flex gap-3 items-start w-full sm:w-auto">
+                        ${rec.pictureData 
+                            ? `<img src="${rec.pictureData}" class="w-16 h-16 object-cover rounded-lg border border-slate-300 shrink-0">`
+                            : `<div class="w-16 h-16 bg-slate-200 rounded-lg flex items-center justify-center text-slate-400 text-xs shrink-0"><i class="fa-solid fa-image text-xl"></i></div>`
+                        }
+                        <div class="space-y-0.5 text-xs">
+                            <div class="flex items-center gap-1.5 flex-wrap">
+                                <span class="font-bold text-slate-900 text-sm">${rec.docket || 'NO DOCKET'}</span>
+                                <span class="bg-indigo-100 text-indigo-800 text-[10px] font-semibold px-1.5 py-0.5 rounded">${rec.typ}</span>
+                            </div>
+                            <p class="font-medium text-slate-700">${rec.comp} (${rec.cont})</p>
+                            <p class="text-slate-500">${rec.addr ? rec.addr + ', ' : ''}${rec.cps || ''}</p>
+                            <p class="text-[10px] text-slate-400 font-mono mt-1"><i class="fa-solid fa-file-image me-1"></i>${rec.pictureName}</p>
+                        </div>
+                    </div>
+                    <div class="flex sm:flex-col items-center justify-end gap-2 w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-200">
+                        <button onclick="editRecord(${rec.id})" class="bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition">
+                            <i class="fa-solid fa-pen-to-square"></i> Edit
+                        </button>
+                        <button onclick="deleteRecord(${rec.id})" class="bg-rose-50 hover:bg-rose-100 text-rose-700 text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition">
+                            <i class="fa-solid fa-trash"></i> Delete
+                        </button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        async function editRecord(id) {
+            const transaction = db.transaction(['dockets'], 'readonly');
+            const store = transaction.objectStore('dockets');
+            const request = store.get(id);
+
+            request.onsuccess = () => {
+                const rec = request.result;
+                if (!rec) return;
+
+                editingId = rec.id;
+                document.getElementById('inputTyp').value = rec.typ || '';
+                document.getElementById('inputComp').value = rec.comp || '';
+                document.getElementById('inputCont').value = rec.cont || '';
+                document.getElementById('inputPh').value = rec.ph || '';
+                document.getElementById('inputAddr').value = rec.addr || '';
+                document.getElementById('inputCps').value = rec.cps || '';
+                document.getElementById('inputReg').value = rec.reg || '';
+                document.getElementById('inputDocket').value = rec.docket || '';
+
+                if (rec.pictureData) {
+                    currentPictureBase64 = rec.pictureData;
+                    document.getElementById('imagePreview').src = rec.pictureData;
+                    document.getElementById('imagePreviewWrapper').classList.remove('hidden');
+                } else {
+                    clearImage();
+                }
+
+                updateImageFileName();
+                document.getElementById('saveBtn').innerHTML = `<i class="fa-solid fa-check"></i><span>Update Details</span>`;
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            };
+        }
+
+        async function deleteRecord(id) {
+            if (!confirm("Are you sure you want to delete this docket entry?")) return;
+            const transaction = db.transaction(['dockets'], 'readwrite');
+            await transaction.objectStore('dockets').delete(id);
+            showToast("Record deleted", "info");
+            loadSavedRecords();
+        }
+
+        function clearAllData() {
+            if (!confirm("Delete ALL saved scans from this device?")) return;
+            const transaction = db.transaction(['dockets'], 'readwrite');
+            transaction.objectStore('dockets').clear();
+            showToast("All records cleared", "info");
+            loadSavedRecords();
+        }
+
+        function resetForm() {
+            editingId = null;
+            document.getElementById('docketForm').reset();
+            clearImage();
+            updateImageFileName();
+            document.getElementById('saveBtn').innerHTML = `<i class="fa-solid fa-floppy-disk"></i><span>Save Details</span>`;
+        }
+
+        // --- CSV & ZIP EXPORT / SHARING ---
+        async function exportDataZip() {
+            const transaction = db.transaction(['dockets'], 'readonly');
+            const store = transaction.objectStore('dockets');
+            const request = store.getAll();
+
+            request.onsuccess = async () => {
+                const records = request.result;
+                if (records.length === 0) {
+                    showToast("No records available to export", "error");
+                    return;
+                }
+
+                showToast("Building Zip Package...", "info");
+
+                const zip = new JSZip();
+
+                // Generate CSV Header & Lines
+                const csvHeaders = ["ID", "Docket Number", "Type", "Company Name", "Contact Person", "Phone", "Address", "CPS", "Region", "Picture File Name", "Timestamp"];
+                const csvRows = [csvHeaders.join(",")];
+
+                records.forEach((r, idx) => {
+                    const row = [
+                        idx + 1,
+                        `"${(r.docket || '').replace(/"/g, '""')}"`,
+                        `"${(r.typ || '').replace(/"/g, '""')}"`,
+                        `"${(r.comp || '').replace(/"/g, '""')}"`,
+                        `"${(r.cont || '').replace(/"/g, '""')}"`,
+                        `"${(r.ph || '').replace(/"/g, '""')}"`,
+                        `"${(r.addr || '').replace(/"/g, '""')}"`,
+                        `"${(r.cps || '').replace(/"/g, '""')}"`,
+                        `"${(r.reg || '').replace(/"/g, '""')}"`,
+                        `"${r.pictureName}"`,
+                        `"${r.timestamp}"`
+                    ];
+                    csvRows.push(row.join(","));
+
+                    // Add Image file to Zip if present
+                    if (r.pictureData && r.pictureData.includes(',')) {
+                        const base64Data = r.pictureData.split(',')[1];
+                        zip.file(r.pictureName, base64Data, { base64: true });
+                    }
+                });
+
+                zip.file("dockets.csv", csvRows.join("\n"));
+
+                // Generate Zip Blob
+                const zipContent = await zip.generateAsync({ type: "blob" });
+                const fileName = `Docket_Export_${new Date().toISOString().slice(0,10)}.zip`;
+
+                // Web Share API support (Android Native Share Sheet)
+                if (navigator.share && navigator.canShare) {
+                    const file = new File([zipContent], fileName, { type: "application/zip" });
+                    if (navigator.canShare({ files: [file] })) {
+                        try {
+                            await navigator.share({
+                                title: 'Calendar Docket Scanner Export',
+                                text: 'Attached docket details CSV and package images.',
+                                files: [file]
+                            });
+                            showToast("Shared successfully!", "success");
+                            return;
+                        } catch (err) {
+                            if (err.name !== 'AbortError') console.error(err);
+                        }
+                    }
+                }
+
+                // Fallback Direct File Download
+                const link = document.createElement('a');
+                link.href = URL.createObjectURL(zipContent);
+                link.download = fileName;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                showToast("Zip downloaded successfully!", "success");
+            };
+        }
+    </script>
+</body>
+</html>
