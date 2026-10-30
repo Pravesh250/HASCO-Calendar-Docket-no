@@ -11,7 +11,6 @@
     <!-- JSZip for bundling CSV and Images into Zip -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <style>
-        /* Custom Mobile & Dark Mode Adjustments */
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
             background-color: #0f172a;
@@ -32,7 +31,7 @@
         .scan-overlay {
             position: absolute;
             top: 0; left: 0; right: 0; bottom: 0;
-            border: 2px solid rgba(6, 182, 212, 0.5);
+            border: 2px solid rgba(99, 102, 241, 0.5);
             box-shadow: inset 0 0 0 2000px rgba(0, 0, 0, 0.45);
             display: flex;
             align-items: center;
@@ -41,13 +40,14 @@
         .scan-box {
             width: 80%;
             height: 60%;
-            border: 2px dashed #06b6d4;
+            border: 2px dashed #6366f1;
             border-radius: 8px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.3);
             animation: pulse 2s infinite;
         }
         @keyframes pulse {
-            0%, 100% { border-color: #06b6d4; box-shadow: 0 0 10px rgba(6, 182, 212, 0.3); }
-            50% { border-color: #22d3ee; box-shadow: 0 0 20px rgba(34, 211, 238, 0.6); }
+            0%, 100% { border-color: #6366f1; }
+            50% { border-color: #818cf8; }
         }
         ::-webkit-scrollbar {
             width: 6px;
@@ -62,87 +62,90 @@
 <body class="bg-slate-900 min-h-screen text-slate-100 pb-12">
 
     <!-- Header -->
-    <header class="bg-slate-800/90 backdrop-blur border-b border-slate-700 text-white sticky top-0 z-30">
+    <header class="bg-slate-800 border-b border-slate-700 text-white shadow-md sticky top-0 z-30">
         <div class="max-w-4xl mx-auto px-4 py-3 flex justify-between items-center">
-            <div class="flex items-center space-x-2.5">
-                <div class="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
-                    <i class="fa-solid fa-qrcode"></i>
-                </div>
-                <h1 class="font-bold text-base sm:text-lg tracking-wide text-cyan-400">Calendar Docket Scanner</h1>
+            <div class="flex items-center space-x-2">
+                <i class="fa-solid fa-qrcode text-xl text-indigo-400"></i>
+                <h1 class="font-bold text-lg leading-tight tracking-wide">Calendar Docket Scanner</h1>
             </div>
-            <div id="connectionStatus" class="flex items-center space-x-1.5 text-xs bg-slate-700/60 border border-slate-600 px-2.5 py-1 rounded-full text-emerald-400">
-                <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse inline-block"></span>
-                <span>Offline Ready</span>
+            <div id="connectionStatus" class="flex items-center space-x-1.5 text-xs bg-slate-900 border border-slate-700 px-3 py-1 rounded-full">
+                <span class="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse"></span>
+                <span class="text-slate-300 font-medium">Offline Ready</span>
             </div>
         </div>
     </header>
 
-    <main class="max-w-4xl mx-auto px-4 py-4 space-y-5">
+    <main class="max-w-4xl mx-auto px-4 py-5 space-y-5">
 
         <!-- Toast Notification Container -->
-        <div id="toast" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-slate-800 border border-slate-600 text-slate-100 px-4 py-2.5 rounded-xl text-sm shadow-2xl z-50 transition-opacity duration-300 opacity-0 pointer-events-none flex items-center space-x-2">
-            <i id="toastIcon" class="fa-solid fa-circle-info text-cyan-400"></i>
-            <span id="toastMsg">Notification message</span>
+        <div id="toast" class="fixed bottom-5 left-1/2 transform -translate-x-1/2 bg-slate-800 border border-slate-700 text-white px-4 py-3 rounded-xl text-sm shadow-2xl z-50 transition-opacity duration-300 opacity-0 pointer-events-none flex items-center space-x-2.5">
+            <i id="toastIcon" class="fa-solid fa-circle-info text-indigo-400 text-base"></i>
+            <span id="toastMsg" class="font-medium">Notification message</span>
         </div>
 
         <!-- Main Form Section -->
-        <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-xl p-4 sm:p-6 space-y-4">
-            <div class="flex flex-wrap justify-between items-center gap-2 border-b border-slate-700/80 pb-3">
-                <h2 class="font-semibold text-cyan-400 flex items-center gap-2">
-                    <i class="fa-solid fa-file-pen"></i> Docket Information
+        <div class="bg-slate-800 rounded-2xl shadow-xl border border-slate-700/80 p-4 sm:p-6 space-y-4">
+            <div class="flex justify-between items-center border-b border-slate-700/80 pb-3">
+                <h2 class="font-semibold text-slate-200 flex items-center gap-2">
+                    <i class="fa-solid fa-file-pen text-indigo-400"></i> Docket Information
                 </h2>
-                <button type="button" onclick="toggleScanner('QR')" class="bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700 text-white text-xs font-semibold px-3.5 py-2 rounded-xl flex items-center gap-2 shadow-md transition">
+                <button type="button" onclick="toggleScanner('QR')" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow transition">
                     <i class="fa-solid fa-qrcode"></i>
-                    <span>Scan Details QR</span>
+                    <span id="qrBtnText">Scan Details QR</span>
                 </button>
             </div>
 
-            <!-- In-line Scanner Viewport for QR Scanner -->
-            <div id="qrScannerContainer" class="hidden bg-slate-950 border border-cyan-500/40 rounded-xl p-3 text-white space-y-2">
+            <!-- In-line QR Scanner Viewport -->
+            <div id="qrScannerContainer" class="hidden bg-slate-950 rounded-2xl p-3 border border-indigo-500/40 relative text-white space-y-2">
                 <div class="flex justify-between items-center px-1">
-                    <span class="text-xs font-medium text-cyan-400 flex items-center gap-1.5">
-                        <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span> Scanning QR Code...
+                    <span class="text-xs font-semibold text-indigo-300 flex items-center gap-1.5">
+                        <i class="fa-solid fa-camera"></i> Scanning Details QR Code...
                     </span>
-                    <button type="button" onclick="stopScanner()" class="text-slate-400 hover:text-white px-2 py-0.5">
-                        <i class="fa-solid fa-xmark text-sm"></i> Close
+                    <button type="button" onclick="stopScanner('QR')" class="text-slate-400 hover:text-white p-1">
+                        <i class="fa-solid fa-xmark text-lg"></i>
                     </button>
                 </div>
-                <div class="scanner-viewport h-52 sm:h-64 relative">
+                <div class="scanner-viewport h-56 sm:h-64 relative">
                     <video id="qrVideoPreview" playsinline></video>
-                    <div class="scan-overlay"><div class="scan-box"></div></div>
+                    <div class="scan-overlay">
+                        <div class="scan-box"></div>
+                    </div>
+                </div>
+                <div class="text-center text-[11px] text-slate-400">
+                    Align QR code inside frame to fill form details.
                 </div>
             </div>
 
             <form id="docketForm" class="space-y-4" onsubmit="event.preventDefault(); saveEntry();">
                 <!-- Parsed Details Grid -->
-                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
                     <div>
                         <label class="block text-xs font-medium text-slate-300 mb-1">Type (TYP)</label>
-                        <input type="text" id="inputTyp" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 focus:outline-none" placeholder="e.g. Express / Standard" required oninput="updateImageFileName()">
+                        <input type="text" id="inputTyp" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-xl text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none" placeholder="Type" required oninput="updateImageFileName()">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-300 mb-1">Company Name (COMP)</label>
-                        <input type="text" id="inputComp" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 focus:outline-none" placeholder="Company Name" required oninput="updateImageFileName()">
+                        <input type="text" id="inputComp" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-xl text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none" placeholder="Company Name" required oninput="updateImageFileName()">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-300 mb-1">Contact Person (CONT)</label>
-                        <input type="text" id="inputCont" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 focus:outline-none" placeholder="Contact Name" required oninput="updateImageFileName()">
+                        <input type="text" id="inputCont" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-xl text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none" placeholder="Contact Person" required oninput="updateImageFileName()">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-300 mb-1">Contact No (PH)</label>
-                        <input type="tel" id="inputPh" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 focus:outline-none" placeholder="Phone Number">
+                        <input type="tel" id="inputPh" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-xl text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none" placeholder="Phone Number">
                     </div>
                     <div class="sm:col-span-2">
                         <label class="block text-xs font-medium text-slate-300 mb-1">Address (ADDR)</label>
-                        <input type="text" id="inputAddr" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 focus:outline-none" placeholder="Street / Building / Area">
+                        <textarea id="inputAddr" rows="2" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-xl text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none resize-none" placeholder="Complete Street Address"></textarea>
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-300 mb-1">City-Pin;State (CPS)</label>
-                        <input type="text" id="inputCps" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 focus:outline-none" placeholder="e.g. Mumbai-400001;MH">
+                        <input type="text" id="inputCps" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-xl text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none" placeholder="City-Pin;State">
                     </div>
                     <div>
                         <label class="block text-xs font-medium text-slate-300 mb-1">Region (REG)</label>
-                        <input type="text" id="inputReg" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 focus:outline-none" placeholder="e.g. West / North">
+                        <input type="text" id="inputReg" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-xl text-slate-100 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 focus:outline-none" placeholder="Region">
                     </div>
                 </div>
 
@@ -150,65 +153,70 @@
                 <div class="pt-2 border-t border-slate-700/80 space-y-2">
                     <label class="block text-xs font-medium text-slate-300">Courier Docket Number</label>
                     <div class="flex gap-2">
-                        <input type="text" id="inputDocket" class="w-full px-3 py-2 text-sm bg-slate-900 border border-slate-700 rounded-lg text-slate-100 font-mono focus:ring-2 focus:ring-cyan-500 focus:outline-none uppercase" placeholder="Enter or scan Docket No." required>
-                        <button type="button" onclick="toggleScanner('DOCKET')" class="bg-slate-700 hover:bg-slate-600 text-cyan-300 px-3.5 py-2 rounded-lg text-xs font-semibold flex items-center gap-1.5 shrink-0 border border-slate-600 transition">
-                            <i class="fa-solid fa-barcode"></i>
-                            <span>Scan Docket</span>
+                        <input type="text" id="inputDocket" class="w-full px-3 py-2.5 text-sm font-mono bg-slate-900 border border-slate-700 rounded-xl text-indigo-300 font-semibold uppercase focus:border-indigo-500 focus:outline-none" placeholder="Enter or scan Docket No." required>
+                        <button type="button" onclick="toggleScanner('DOCKET')" class="bg-slate-700 hover:bg-slate-600 text-white px-3.5 py-2.5 rounded-xl text-xs font-medium flex items-center gap-1.5 shrink-0 transition">
+                            <i class="fa-solid fa-barcode text-indigo-400"></i>
+                            <span id="docketBtnText">Scan Barcode</span>
                         </button>
                     </div>
 
-                    <!-- In-line Scanner Viewport for Docket Barcode Scanner -->
-                    <div id="docketScannerContainer" class="hidden bg-slate-950 border border-cyan-500/40 rounded-xl p-3 text-white space-y-2">
+                    <!-- In-line Barcode Scanner Viewport -->
+                    <div id="docketScannerContainer" class="hidden bg-slate-950 rounded-2xl p-3 border border-indigo-500/40 relative text-white space-y-2 mt-2">
                         <div class="flex justify-between items-center px-1">
-                            <span class="text-xs font-medium text-cyan-400 flex items-center gap-1.5">
-                                <span class="w-2 h-2 rounded-full bg-cyan-400 animate-ping"></span> Scanning Docket Barcode...
+                            <span class="text-xs font-semibold text-indigo-300 flex items-center gap-1.5">
+                                <i class="fa-solid fa-barcode"></i> Scanning Docket Barcode...
                             </span>
-                            <button type="button" onclick="stopScanner()" class="text-slate-400 hover:text-white px-2 py-0.5">
-                                <i class="fa-solid fa-xmark text-sm"></i> Close
+                            <button type="button" onclick="stopScanner('DOCKET')" class="text-slate-400 hover:text-white p-1">
+                                <i class="fa-solid fa-xmark text-lg"></i>
                             </button>
                         </div>
                         <div class="scanner-viewport h-48 sm:h-56 relative">
                             <video id="docketVideoPreview" playsinline></video>
-                            <div class="scan-overlay"><div class="scan-box"></div></div>
+                            <div class="scan-overlay">
+                                <div class="scan-box"></div>
+                            </div>
+                        </div>
+                        <div class="text-center text-[11px] text-slate-400">
+                            Align barcode inside frame to auto-fill docket number.
                         </div>
                     </div>
                 </div>
 
                 <!-- Package Picture Capture Section -->
-                <div class="pt-2 border-t border-slate-700/80 space-y-2">
-                    <label class="block text-xs font-medium text-slate-300">Package Picture (Auto compressed)</label>
+                <div class="pt-2 border-t border-slate-700/80 space-y-2.5">
+                    <label class="block text-xs font-medium text-slate-300">Package Picture (3 - 5 MB original capability, auto-compressed)</label>
                     
                     <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-center">
                         <div class="sm:col-span-2">
-                            <label class="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-slate-700 rounded-xl cursor-pointer bg-slate-900 hover:bg-slate-900/80 hover:border-slate-600 transition">
+                            <label class="flex flex-col items-center justify-center w-full h-24 border-2 border-dashed border-slate-700 hover:border-slate-500 rounded-2xl cursor-pointer bg-slate-900/60 hover:bg-slate-900 transition">
                                 <div class="flex flex-col items-center justify-center pt-2 pb-2">
-                                    <i class="fa-solid fa-camera text-slate-400 text-xl mb-1"></i>
+                                    <i class="fa-solid fa-camera text-indigo-400 text-xl mb-1"></i>
                                     <p class="text-xs text-slate-300 font-medium">Take photo or upload image</p>
-                                    <p class="text-[10px] text-slate-500 mt-0.5">JPG / PNG supported</p>
+                                    <p class="text-[10px] text-slate-500 mt-0.5">JPG / PNG compressed automatically</p>
                                 </div>
                                 <input id="cameraInput" type="file" accept="image/*" capture="environment" class="hidden" onchange="handleImageCapture(event)" />
                             </label>
                         </div>
 
                         <!-- Image Preview Box -->
-                        <div id="imagePreviewWrapper" class="h-24 bg-slate-900 rounded-xl border border-slate-700 flex items-center justify-center relative overflow-hidden hidden">
+                        <div id="imagePreviewWrapper" class="h-24 bg-slate-950 rounded-2xl border border-slate-700 flex items-center justify-center relative overflow-hidden hidden">
                             <img id="imagePreview" src="" alt="Package Preview" class="w-full h-full object-cover">
-                            <button type="button" onclick="clearImage()" class="absolute top-1 right-1 bg-rose-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-[10px] shadow">
+                            <button type="button" onclick="clearImage()" class="absolute top-1.5 right-1.5 bg-rose-600 hover:bg-rose-700 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs shadow">
                                 <i class="fa-solid fa-xmark"></i>
                             </button>
                         </div>
                     </div>
 
                     <!-- Auto-Generated File Name Banner -->
-                    <div class="bg-slate-900 border border-slate-700 rounded-lg p-2.5 text-xs text-slate-300 flex items-center justify-between">
-                        <span class="font-medium text-slate-400">Photo File Name:</span>
-                        <span id="generatedFileName" class="font-mono font-semibold text-cyan-400 truncate max-w-[220px] sm:max-w-xs">_ _ .jpg</span>
+                    <div class="bg-slate-900/90 border border-slate-700/80 rounded-xl p-2.5 text-xs text-slate-300 flex items-center justify-between">
+                        <span class="text-slate-400">Photo Name Format:</span>
+                        <span id="generatedFileName" class="font-mono font-semibold text-indigo-300 truncate max-w-[220px] sm:max-w-xs">_ _ .jpg</span>
                     </div>
                 </div>
 
                 <!-- Form Actions -->
-                <div class="pt-3 flex gap-2">
-                    <button type="submit" id="saveBtn" class="flex-1 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white py-2.5 rounded-xl text-sm font-semibold shadow-lg flex items-center justify-center gap-2 transition">
+                <div class="pt-2 flex gap-2.5">
+                    <button type="submit" id="saveBtn" class="flex-1 bg-emerald-600 hover:bg-emerald-500 text-white py-2.5 rounded-xl text-sm font-semibold shadow-md flex items-center justify-center gap-2 transition">
                         <i class="fa-solid fa-floppy-disk"></i>
                         <span>Save Details</span>
                     </button>
@@ -220,39 +228,28 @@
         </div>
 
         <!-- Saved Records Section -->
-        <div class="bg-slate-800 border border-slate-700 rounded-2xl shadow-xl p-4 sm:p-6 space-y-4">
-            <!-- Header & Date Picker Filter Controls -->
-            <div class="flex flex-col space-y-3 border-b border-slate-700/80 pb-3">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                    <div class="flex items-center space-x-2">
-                        <h2 class="font-semibold text-cyan-400 flex items-center gap-2">
-                            <i class="fa-solid fa-list-check"></i> Saved Scans
-                        </h2>
-                        <span id="recordCount" class="bg-cyan-950 text-cyan-400 border border-cyan-800 text-xs font-bold px-2.5 py-0.5 rounded-full">0</span>
-                    </div>
-
-                    <div class="flex items-center gap-2">
-                        <button type="button" onclick="exportDataZip()" class="bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-semibold px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow transition">
-                            <i class="fa-solid fa-share-nodes"></i>
-                            <span>Share Zip</span>
-                        </button>
-                        <button type="button" onclick="clearAllData()" class="text-rose-400 hover:bg-rose-950/50 p-2 rounded-lg transition" title="Delete All">
-                            <i class="fa-solid fa-trash-can text-sm"></i>
-                        </button>
-                    </div>
+        <div class="bg-slate-800 rounded-2xl shadow-xl border border-slate-700/80 p-4 sm:p-6 space-y-4">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-700/80 pb-3">
+                <div class="flex items-center space-x-2">
+                    <h2 class="font-semibold text-slate-200 flex items-center gap-2">
+                        <i class="fa-solid fa-list-check text-indigo-400"></i> Saved Scans
+                    </h2>
+                    <span id="recordCount" class="bg-indigo-950 text-indigo-300 border border-indigo-700/50 text-xs font-bold px-2.5 py-0.5 rounded-full">0</span>
                 </div>
 
                 <!-- Date Picker Filter -->
-                <div class="flex flex-wrap items-center justify-between bg-slate-900 border border-slate-700 rounded-xl p-2.5 gap-2">
-                    <div class="flex items-center space-x-2 w-full sm:w-auto">
-                        <i class="fa-solid fa-calendar-day text-cyan-400 text-xs"></i>
-                        <span class="text-xs font-medium text-slate-300">Filter Date:</span>
-                        <input type="date" id="dateFilter" class="bg-slate-800 border border-slate-700 text-slate-100 text-xs rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-1 focus:ring-cyan-500" onchange="loadSavedRecords()">
-                    </div>
-                    <div class="flex items-center space-x-2">
-                        <button type="button" onclick="setFilterToday()" class="text-[11px] font-medium bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2.5 py-1 rounded-lg text-slate-300">Today</button>
-                        <button type="button" onclick="clearDateFilter()" class="text-[11px] font-medium bg-slate-800 hover:bg-slate-700 border border-slate-700 px-2.5 py-1 rounded-lg text-slate-300">All Dates</button>
-                    </div>
+                <div class="flex items-center gap-2">
+                    <input type="date" id="dateFilter" onchange="loadSavedRecords()" class="bg-slate-900 border border-slate-700 text-xs text-slate-200 rounded-xl px-2.5 py-2 focus:border-indigo-500 focus:outline-none">
+                    <button type="button" onclick="clearDateFilter()" title="Show All Dates" class="bg-slate-700 hover:bg-slate-600 text-slate-300 text-xs px-2.5 py-2 rounded-xl transition">
+                        All
+                    </button>
+                    <button type="button" onclick="exportDataZip()" class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-2 rounded-xl flex items-center gap-1.5 shadow transition">
+                        <i class="fa-solid fa-share-nodes"></i>
+                        <span>Share Zip</span>
+                    </button>
+                    <button type="button" onclick="clearAllData()" title="Clear All" class="text-rose-400 hover:bg-rose-950/50 p-2 rounded-xl transition">
+                        <i class="fa-solid fa-trash-can text-sm"></i>
+                    </button>
                 </div>
             </div>
 
@@ -260,26 +257,25 @@
             <div id="recordsList" class="space-y-3">
                 <div class="text-center py-8 text-slate-500 text-sm">
                     <i class="fa-solid fa-box-open text-3xl mb-2 text-slate-600"></i>
-                    <p>No docket entries saved for selected date.</p>
+                    <p>No docket entries saved for this selection.</p>
                 </div>
             </div>
         </div>
 
     </main>
 
-    <!-- IndexedDB & App Logic -->
+    <!-- App Scripts & Logic -->
     <script>
-        // Global State & Database
         let db = null;
-        let activeStream = null;
-        let currentScanMode = null; // 'QR' or 'DOCKET'
+        let qrStream = null;
+        let docketStream = null;
         let editingId = null;
         let currentPictureBase64 = null;
 
-        // Initialize DB
+        // Initialize IndexedDB
         function initDB() {
             return new Promise((resolve, reject) => {
-                const request = indexedDB.open('CalendarDocketDB', 1);
+                const request = indexedDB.open('CalendarDocketDB', 2);
                 request.onupgradeneeded = (e) => {
                     const db = e.target.result;
                     if (!db.objectStoreNames.contains('dockets')) {
@@ -294,22 +290,17 @@
             });
         }
 
-        function getTodayDateString() {
-            const today = new Date();
-            const year = today.getFullYear();
-            const month = String(today.getMonth() + 1).padStart(2, '0');
-            const day = String(today.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
-        }
-
         window.onload = async () => {
+            // Default filter date to today (YYYY-MM-DD)
+            const today = new Date().toISOString().split('T')[0];
+            document.getElementById('dateFilter').value = today;
+
             try {
                 await initDB();
-                document.getElementById('dateFilter').value = getTodayDateString();
                 loadSavedRecords();
                 updateImageFileName();
             } catch (err) {
-                showToast("Database initialization error", "error");
+                showToast("Database error", "error");
             }
         };
 
@@ -320,11 +311,11 @@
 
             toastMsg.innerText = message;
             if (type === 'error') {
-                toastIcon.className = "fa-solid fa-triangle-exclamation text-rose-400";
+                toastIcon.className = "fa-solid fa-triangle-exclamation text-rose-400 text-base";
             } else if (type === 'success') {
-                toastIcon.className = "fa-solid fa-circle-check text-emerald-400";
+                toastIcon.className = "fa-solid fa-circle-check text-emerald-400 text-base";
             } else {
-                toastIcon.className = "fa-solid fa-circle-info text-cyan-400";
+                toastIcon.className = "fa-solid fa-circle-info text-indigo-400 text-base";
             }
 
             toast.classList.remove('opacity-0', 'pointer-events-none');
@@ -335,72 +326,91 @@
             }, 3000);
         }
 
-        // --- IN-LINE CAMERA & BARCODE DETECTOR LOGIC ---
+        // --- IN-LINE CAMERA SCANNER LOGIC ---
         async function toggleScanner(mode) {
-            if (activeStream && currentScanMode === mode) {
-                stopScanner();
-                return;
-            }
-            stopScanner(); // Stop any active video stream first
-            
-            currentScanMode = mode;
-            const qrContainer = document.getElementById('qrScannerContainer');
-            const docketContainer = document.getElementById('docketScannerContainer');
-            const targetVideo = mode === 'QR' ? document.getElementById('qrVideoPreview') : document.getElementById('docketVideoPreview');
-
             if (mode === 'QR') {
-                qrContainer.classList.remove('hidden');
+                const container = document.getElementById('qrScannerContainer');
+                if (!container.classList.contains('hidden')) {
+                    stopScanner('QR');
+                    return;
+                }
+                stopScanner('DOCKET');
+                container.classList.remove('hidden');
+                document.getElementById('qrBtnText').innerText = "Close Scanner";
+                await startCamera('QR');
             } else {
-                docketContainer.classList.remove('hidden');
+                const container = document.getElementById('docketScannerContainer');
+                if (!container.classList.contains('hidden')) {
+                    stopScanner('DOCKET');
+                    return;
+                }
+                stopScanner('QR');
+                container.classList.remove('hidden');
+                document.getElementById('docketBtnText').innerText = "Close";
+                await startCamera('DOCKET');
             }
+        }
+
+        async function startCamera(mode) {
+            const videoId = mode === 'QR' ? 'qrVideoPreview' : 'docketVideoPreview';
+            const video = document.getElementById(videoId);
 
             try {
-                const constraints = { video: { facingMode: { exact: "environment" } } };
-                try {
-                    activeStream = await navigator.mediaDevices.getUserMedia(constraints);
-                } catch {
-                    activeStream = await navigator.mediaDevices.getUserMedia({ video: true });
-                }
+                const stream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { exact: "environment" } }
+                }).catch(() => navigator.mediaDevices.getUserMedia({ video: true }));
 
-                targetVideo.srcObject = activeStream;
-                await targetVideo.play();
-                requestAnimationFrame(scanFrame);
+                if (mode === 'QR') qrStream = stream;
+                else docketStream = stream;
+
+                video.srcObject = stream;
+                await video.play();
+
+                requestAnimationFrame(() => scanFrame(mode));
             } catch (err) {
-                showToast("Unable to access camera. Check permissions.", "error");
-                stopScanner();
+                showToast("Camera access failed", "error");
+                stopScanner(mode);
             }
         }
 
-        function stopScanner() {
-            if (activeStream) {
-                activeStream.getTracks().forEach(track => track.stop());
-                activeStream = null;
+        function stopScanner(mode) {
+            if (mode === 'QR') {
+                if (qrStream) {
+                    qrStream.getTracks().forEach(t => t.stop());
+                    qrStream = null;
+                }
+                document.getElementById('qrScannerContainer').classList.add('hidden');
+                document.getElementById('qrBtnText').innerText = "Scan Details QR";
+            } else {
+                if (docketStream) {
+                    docketStream.getTracks().forEach(t => t.stop());
+                    docketStream = null;
+                }
+                document.getElementById('docketScannerContainer').classList.add('hidden');
+                document.getElementById('docketBtnText').innerText = "Scan Barcode";
             }
-            document.getElementById('qrScannerContainer').classList.add('hidden');
-            document.getElementById('docketScannerContainer').classList.add('hidden');
-            currentScanMode = null;
         }
 
-        async function scanFrame() {
-            const video = currentScanMode === 'QR' 
-                ? document.getElementById('qrVideoPreview') 
-                : document.getElementById('docketVideoPreview');
+        async function scanFrame(mode) {
+            const activeStream = mode === 'QR' ? qrStream : docketStream;
+            const videoId = mode === 'QR' ? 'qrVideoPreview' : 'docketVideoPreview';
+            const video = document.getElementById(videoId);
 
             if (!activeStream || !video || video.readyState !== video.HAVE_ENOUGH_DATA) {
-                if (activeStream) requestAnimationFrame(scanFrame);
+                if (activeStream) requestAnimationFrame(() => scanFrame(mode));
                 return;
             }
 
             if ('BarcodeDetector' in window) {
                 try {
-                    const formats = currentScanMode === 'QR' ? ['qr_code'] : ['code_128', 'code_39', 'ean_13', 'upc_a', 'qr_code'];
-                    const barcodeDetector = new BarcodeDetector({ formats });
-                    const barcodes = await barcodeDetector.detect(video);
-                    
+                    const formats = mode === 'QR' ? ['qr_code'] : ['code_128', 'code_39', 'ean_13', 'upc_a', 'qr_code'];
+                    const detector = new BarcodeDetector({ formats });
+                    const barcodes = await detector.detect(video);
+
                     if (barcodes.length > 0) {
                         const rawValue = barcodes[0].rawValue;
-                        handleScannedCode(rawValue);
-                        stopScanner();
+                        handleScannedCode(mode, rawValue);
+                        stopScanner(mode);
                         return;
                     }
                 } catch (e) {
@@ -409,52 +419,61 @@
             }
 
             if (activeStream) {
-                setTimeout(() => requestAnimationFrame(scanFrame), 200);
+                setTimeout(() => requestAnimationFrame(() => scanFrame(mode)), 200);
             }
         }
 
-        function handleScannedCode(rawValue) {
-            if (currentScanMode === 'QR') {
+        function handleScannedCode(mode, rawValue) {
+            if (mode === 'QR') {
                 parseAndPopulateQR(rawValue);
                 showToast("QR details parsed successfully!", "success");
-            } else if (currentScanMode === 'DOCKET') {
+            } else {
                 document.getElementById('inputDocket').value = rawValue.trim();
-                showToast("Docket number captured!", "success");
+                showToast("Docket number scanned!", "success");
             }
         }
 
+        // Enhanced Key-Value QR Code Parser
         function parseAndPopulateQR(text) {
-            const fields = {
-                TYP: 'inputTyp',
-                COMP: 'inputComp',
-                CONT: 'inputCont',
-                ADDR: 'inputAddr',
-                PH: 'inputPh',
-                CPS: 'inputCps',
-                REG: 'inputReg'
-            };
+            if (!text) return;
 
-            const pairs = text.split(/[,;\n\r]+/);
+            // Pattern looks ahead for known tag keys followed by = to slice values correctly without truncating semicolons or commas
+            const keyPattern = /(TYP|COMP|CONT|CONTACT|ADDR|ADDRESS|PH|PHONE|CPS|REG|REGION)\s*=/gi;
             
-            pairs.forEach(pair => {
-                const parts = pair.split('=');
-                if (parts.length >= 2) {
-                    const key = parts[0].trim().toUpperCase();
-                    const val = parts.slice(1).join('=').trim();
+            let matches = [];
+            let match;
+            while ((match = keyPattern.exec(text)) !== null) {
+                matches.push({
+                    key: match[1].toUpperCase(),
+                    startIndex: match.index,
+                    valIndex: match.index + match[0].length
+                });
+            }
 
-                    for (let fKey in fields) {
-                        if (key === fKey || key.startsWith(fKey)) {
-                            const inputEl = document.getElementById(fields[fKey]);
-                            if (inputEl) inputEl.value = val;
-                        }
-                    }
-                }
-            });
+            const parsed = {};
+            for (let i = 0; i < matches.length; i++) {
+                const current = matches[i];
+                const next = matches[i + 1];
+                let rawVal = next ? text.slice(current.valIndex, next.startIndex) : text.slice(current.valIndex);
+                
+                // Clean trailing separation characters right before the next key
+                rawVal = rawVal.replace(/[,;\n\r\s]+$/, '').trim();
+                parsed[current.key] = rawVal;
+            }
+
+            // Map parsed tags to corresponding inputs
+            if (parsed.TYP) document.getElementById('inputTyp').value = parsed.TYP;
+            if (parsed.COMP) document.getElementById('inputComp').value = parsed.COMP;
+            if (parsed.CONT || parsed.CONTACT) document.getElementById('inputCont').value = parsed.CONT || parsed.CONTACT;
+            if (parsed.PH || parsed.PHONE) document.getElementById('inputPh').value = parsed.PH || parsed.PHONE;
+            if (parsed.ADDR || parsed.ADDRESS) document.getElementById('inputAddr').value = parsed.ADDR || parsed.ADDRESS;
+            if (parsed.CPS) document.getElementById('inputCps').value = parsed.CPS;
+            if (parsed.REG || parsed.REGION) document.getElementById('inputReg').value = parsed.REG || parsed.REGION;
 
             updateImageFileName();
         }
 
-        // --- PICTURE HANDLING & AUTO-NAMING ---
+        // --- PICTURE HANDLING & AUTOMATIC NAMING ---
         function updateImageFileName() {
             const typ = document.getElementById('inputTyp').value.trim();
             const comp = document.getElementById('inputComp').value.trim();
@@ -499,10 +518,9 @@
                     ctx.drawImage(img, 0, 0, width, height);
 
                     currentPictureBase64 = canvas.toDataURL('image/jpeg', 0.8);
-                    
                     document.getElementById('imagePreview').src = currentPictureBase64;
                     document.getElementById('imagePreviewWrapper').classList.remove('hidden');
-                    showToast("Picture attached & compressed", "info");
+                    showToast("Picture loaded and compressed", "info");
                 };
                 img.src = e.target.result;
             };
@@ -516,21 +534,10 @@
             document.getElementById('imagePreviewWrapper').classList.add('hidden');
         }
 
-        // --- DATE FILTER CONTROLS ---
-        function setFilterToday() {
-            document.getElementById('dateFilter').value = getTodayDateString();
-            loadSavedRecords();
-        }
-
-        function clearDateFilter() {
-            document.getElementById('dateFilter').value = '';
-            loadSavedRecords();
-        }
-
         // --- CRUD OPERATIONS ---
         async function saveEntry() {
-            const dateVal = getTodayDateString(); // YYYY-MM-DD
-            
+            const todayDate = new Date().toISOString().split('T')[0];
+
             const record = {
                 typ: document.getElementById('inputTyp').value.trim(),
                 comp: document.getElementById('inputComp').value.trim(),
@@ -542,7 +549,8 @@
                 docket: document.getElementById('inputDocket').value.trim(),
                 pictureName: updateImageFileName(),
                 pictureData: currentPictureBase64,
-                entryDate: dateVal // YYYY-MM-DD date format
+                date: todayDate,
+                timestamp: new Date().toLocaleString()
             };
 
             const transaction = db.transaction(['dockets'], 'readwrite');
@@ -551,49 +559,46 @@
             if (editingId) {
                 record.id = editingId;
                 await store.put(record);
-                showToast("Docket record updated!", "success");
+                showToast("Entry updated!", "success");
             } else {
                 await store.add(record);
-                showToast("New docket record saved!", "success");
+                showToast("New entry saved!", "success");
             }
 
             resetForm();
             loadSavedRecords();
         }
 
-        // Sort Helper: Sort by Customer / Company Name primary, Contact Person Name secondary
-        function sortRecords(records) {
-            return records.sort((a, b) => {
-                const compA = (a.comp || '').toLowerCase();
-                const compB = (b.comp || '').toLowerCase();
-                if (compA < compB) return -1;
-                if (compA > compB) return 1;
-
-                const contA = (a.cont || '').toLowerCase();
-                const contB = (b.cont || '').toLowerCase();
-                if (contA < contB) return -1;
-                if (contA > contB) return 1;
-                return 0;
-            });
+        function clearDateFilter() {
+            document.getElementById('dateFilter').value = '';
+            loadSavedRecords();
         }
 
         function loadSavedRecords() {
+            if (!db) return;
+            const filterDate = document.getElementById('dateFilter').value;
             const transaction = db.transaction(['dockets'], 'readonly');
             const store = transaction.objectStore('dockets');
             const request = store.getAll();
 
-            const filterDate = document.getElementById('dateFilter').value;
-
             request.onsuccess = () => {
                 let records = request.result;
 
-                // Filter by selected date if date filter is set
+                // Date filtering
                 if (filterDate) {
-                    records = records.filter(r => r.entryDate === filterDate);
+                    records = records.filter(r => r.date === filterDate || (r.timestamp && r.timestamp.startsWith(filterDate)));
                 }
 
-                // Sort by Company Name then Contact Person Name
-                records = sortRecords(records);
+                // Sorting alphabetically by Customer/Company Name, then Contact Person
+                records.sort((a, b) => {
+                    const compA = (a.comp || '').toLowerCase();
+                    const compB = (b.comp || '').toLowerCase();
+                    if (compA !== compB) return compA.localeCompare(compB);
+
+                    const contA = (a.cont || '').toLowerCase();
+                    const contB = (b.cont || '').toLowerCase();
+                    return contA.localeCompare(contB);
+                });
 
                 document.getElementById('recordCount').innerText = records.length;
                 renderRecordsList(records);
@@ -606,34 +611,34 @@
                 container.innerHTML = `
                     <div class="text-center py-8 text-slate-500 text-sm">
                         <i class="fa-solid fa-box-open text-3xl mb-2 text-slate-600"></i>
-                        <p>No docket entries found for selected date.</p>
+                        <p>No docket entries saved for this selection.</p>
                     </div>`;
                 return;
             }
 
             container.innerHTML = records.map(rec => `
-                <div class="border border-slate-700/80 rounded-xl p-3 bg-slate-900 flex flex-col sm:flex-row gap-3 justify-between items-start">
+                <div class="border border-slate-700/80 rounded-2xl p-3.5 bg-slate-900/80 flex flex-col sm:flex-row gap-3 justify-between items-start">
                     <div class="flex gap-3 items-start w-full sm:w-auto">
                         ${rec.pictureData 
-                            ? `<img src="${rec.pictureData}" class="w-16 h-16 object-cover rounded-lg border border-slate-700 shrink-0">`
-                            : `<div class="w-16 h-16 bg-slate-800 border border-slate-700 rounded-lg flex items-center justify-center text-slate-500 text-xs shrink-0"><i class="fa-solid fa-image text-xl"></i></div>`
+                            ? `<img src="${rec.pictureData}" class="w-16 h-16 object-cover rounded-xl border border-slate-700 shrink-0">`
+                            : `<div class="w-16 h-16 bg-slate-800 rounded-xl border border-slate-700 flex items-center justify-center text-slate-500 shrink-0"><i class="fa-solid fa-image text-xl"></i></div>`
                         }
                         <div class="space-y-0.5 text-xs">
-                            <div class="flex items-center gap-1.5 flex-wrap">
-                                <span class="font-bold text-cyan-400 font-mono text-sm">${rec.docket || 'NO DOCKET'}</span>
-                                <span class="bg-cyan-950 text-cyan-300 border border-cyan-800 text-[10px] font-semibold px-1.5 py-0.5 rounded">${rec.typ}</span>
-                                <span class="text-[10px] text-slate-400 bg-slate-800 border border-slate-700 px-1.5 py-0.5 rounded">${rec.entryDate || ''}</span>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <span class="font-bold text-slate-100 text-sm tracking-wide font-mono">${rec.docket || 'NO DOCKET'}</span>
+                                <span class="bg-indigo-950 border border-indigo-700/50 text-indigo-300 text-[10px] font-semibold px-2 py-0.5 rounded-md">${rec.typ}</span>
+                                <span class="text-[10px] text-slate-400 font-mono"><i class="fa-regular fa-calendar me-1"></i>${rec.date || ''}</span>
                             </div>
-                            <p class="font-semibold text-slate-100 text-sm">${rec.comp} <span class="text-slate-400 font-normal">(${rec.cont})</span></p>
-                            <p class="text-slate-400">${rec.addr ? rec.addr + ', ' : ''}${rec.cps || ''}</p>
+                            <p class="font-semibold text-indigo-200">${rec.comp} <span class="text-slate-400 font-normal">(${rec.cont})</span></p>
+                            <p class="text-slate-400 leading-snug">${rec.addr ? rec.addr + ', ' : ''}${rec.cps || ''}</p>
                             <p class="text-[10px] text-slate-500 font-mono mt-1"><i class="fa-solid fa-file-image me-1"></i>Photos/${rec.pictureName}</p>
                         </div>
                     </div>
                     <div class="flex sm:flex-col items-center justify-end gap-2 w-full sm:w-auto border-t sm:border-t-0 pt-2 sm:pt-0 border-slate-800">
-                        <button onclick="editRecord(${rec.id})" class="bg-slate-800 hover:bg-slate-700 text-cyan-400 border border-slate-700 text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition">
+                        <button onclick="editRecord(${rec.id})" class="bg-indigo-950/80 hover:bg-indigo-900 text-indigo-300 border border-indigo-700/40 text-xs px-3 py-1.5 rounded-xl flex items-center gap-1 transition">
                             <i class="fa-solid fa-pen-to-square"></i> Edit
                         </button>
-                        <button onclick="deleteRecord(${rec.id})" class="bg-rose-950/40 hover:bg-rose-900/60 text-rose-400 border border-rose-800/60 text-xs px-2.5 py-1.5 rounded-lg flex items-center gap-1 transition">
+                        <button onclick="deleteRecord(${rec.id})" class="bg-rose-950/80 hover:bg-rose-900 text-rose-300 border border-rose-800/40 text-xs px-3 py-1.5 rounded-xl flex items-center gap-1 transition">
                             <i class="fa-solid fa-trash"></i> Delete
                         </button>
                     </div>
@@ -675,7 +680,7 @@
         }
 
         async function deleteRecord(id) {
-            if (!confirm("Are you sure you want to delete this docket entry?")) return;
+            if (!confirm("Delete this entry?")) return;
             const transaction = db.transaction(['dockets'], 'readwrite');
             await transaction.objectStore('dockets').delete(id);
             showToast("Record deleted", "info");
@@ -700,38 +705,45 @@
 
         // --- CSV & ZIP EXPORT / SHARING ---
         async function exportDataZip() {
+            const filterDate = document.getElementById('dateFilter').value;
             const transaction = db.transaction(['dockets'], 'readonly');
             const store = transaction.objectStore('dockets');
             const request = store.getAll();
-
-            const filterDate = document.getElementById('dateFilter').value;
 
             request.onsuccess = async () => {
                 let records = request.result;
 
                 if (filterDate) {
-                    records = records.filter(r => r.entryDate === filterDate);
+                    records = records.filter(r => r.date === filterDate || (r.timestamp && r.timestamp.startsWith(filterDate)));
                 }
 
                 if (records.length === 0) {
-                    showToast("No records available to export for selected date", "error");
+                    showToast("No records available to export", "error");
                     return;
                 }
 
-                // Sort by Company Name then Contact Person Name
-                records = sortRecords(records);
+                // Sort CSV entries by Customer/Company Name, then Contact Person Name
+                records.sort((a, b) => {
+                    const compA = (a.comp || '').toLowerCase();
+                    const compB = (b.comp || '').toLowerCase();
+                    if (compA !== compB) return compA.localeCompare(compB);
 
-                showToast("Building Zip Package...", "info");
+                    const contA = (a.cont || '').toLowerCase();
+                    const contB = (b.cont || '').toLowerCase();
+                    return contA.localeCompare(contB);
+                });
+
+                showToast("Creating Zip archive...", "info");
 
                 const zip = new JSZip();
-                // Photos folder inside ZIP archive
                 const photosFolder = zip.folder("Photos");
 
-                // CSV Headers & Lines
-                const csvHeaders = ["ID", "Docket Number", "Type", "Company Name", "Contact Person", "Phone", "Address", "CPS", "Region", "Picture File Name", "Date"];
+                // CSV Header & Rows
+                const csvHeaders = ["ID", "Docket Number", "Type", "Company Name", "Contact Person", "Phone", "Address", "CPS", "Region", "Picture Name", "Date"];
                 const csvRows = [csvHeaders.join(",")];
 
                 records.forEach((r, idx) => {
+                    const rowDate = r.date || (r.timestamp ? r.timestamp.split(',')[0] : '');
                     const row = [
                         idx + 1,
                         `"${(r.docket || '').replace(/"/g, '""')}"`,
@@ -742,12 +754,12 @@
                         `"${(r.addr || '').replace(/"/g, '""')}"`,
                         `"${(r.cps || '').replace(/"/g, '""')}"`,
                         `"${(r.reg || '').replace(/"/g, '""')}"`,
-                        `"Photos/${r.pictureName}"`,
-                        `"${r.entryDate || ''}"`
+                        `"${r.pictureName}"`,
+                        `"${rowDate}"`
                     ];
                     csvRows.push(row.join(","));
 
-                    // Save image inside "Photos/" subfolder in Zip
+                    // Save images inside Photos/ subfolder
                     if (r.pictureData && r.pictureData.includes(',')) {
                         const base64Data = r.pictureData.split(',')[1];
                         photosFolder.file(r.pictureName, base64Data, { base64: true });
@@ -757,16 +769,15 @@
                 zip.file("dockets.csv", csvRows.join("\n"));
 
                 const zipContent = await zip.generateAsync({ type: "blob" });
-                const fileName = `Docket_Export_${filterDate || 'All'}.zip`;
+                const exportName = filterDate ? `Docket_Export_${filterDate}.zip` : `Docket_Export_All.zip`;
 
-                // Native Android Share Sheet via Web Share API
                 if (navigator.share && navigator.canShare) {
-                    const file = new File([zipContent], fileName, { type: "application/zip" });
+                    const file = new File([zipContent], exportName, { type: "application/zip" });
                     if (navigator.canShare({ files: [file] })) {
                         try {
                             await navigator.share({
-                                title: 'Calendar Docket Scanner Export',
-                                text: 'Attached docket details CSV and package images.',
+                                title: 'Calendar Docket Export',
+                                text: 'CSV & package images attached.',
                                 files: [file]
                             });
                             showToast("Shared successfully!", "success");
@@ -777,14 +788,13 @@
                     }
                 }
 
-                // Fallback direct download
                 const link = document.createElement('a');
                 link.href = URL.createObjectURL(zipContent);
-                link.download = fileName;
+                link.download = exportName;
                 document.body.appendChild(link);
                 link.click();
                 document.body.removeChild(link);
-                showToast("Zip downloaded successfully!", "success");
+                showToast("Zip downloaded!", "success");
             };
         }
     </script>
